@@ -1,0 +1,304 @@
+/* AgentCompany Dashboard Styles */
+
+:root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-hover: #22263a;
+    --border: #2a2e3e;
+    --text: #e2e8f0;
+    --text-dim: #8892a8;
+    --primary: #6366f1;
+    --primary-hover: #818cf8;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #3b82f6;
+    --radius: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+/* Header */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+header h1 { font-size: 20px; font-weight: 600; }
+
+/* Cost Bar */
+.cost-bar {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    padding: 6px 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.cost-item { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
+.cost-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); }
+.cost-value { font-size: 16px; font-weight: 700; font-family: 'SF Mono', 'Fira Code', monospace; }
+.cost-value#cost-total { color: var(--success); }
+.cost-value#cost-tokens { color: var(--info); }
+.cost-value#cost-calls { color: var(--warning); }
+
+.header-actions { display: flex; gap: 8px; }
+
+/* Buttons */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 14px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-secondary { background: var(--surface-hover); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); }
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+}
+.tab {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 14px;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+/* Main */
+main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Stats */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+.stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+}
+.stat-value { font-size: 32px; font-weight: 700; color: var(--primary); }
+.stat-label { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+
+/* Agent Grid */
+.agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.agent-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    transition: border-color 0.2s;
+}
+.agent-card:hover { border-color: var(--primary); }
+.agent-card .agent-name { font-weight: 600; font-size: 16px; }
+.agent-card .agent-role { color: var(--primary); font-size: 13px; margin-top: 2px; }
+.agent-card .agent-title { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
+
+/* Org Chart */
+.org-chart { padding: 20px; overflow-x: auto; }
+.org-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.org-card {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 20px;
+    text-align: center;
+    min-width: 140px;
+    cursor: default;
+    transition: border-color 0.2s;
+}
+.org-card:hover { border-color: var(--primary); }
+.org-card.owner { border-color: var(--warning); }
+.org-card .org-name { font-weight: 600; font-size: 14px; }
+.org-card .org-title { color: var(--text-dim); font-size: 12px; }
+.org-children {
+    display: flex;
+    gap: 16px;
+    margin-top: 24px;
+    position: relative;
+}
+.org-children::before {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    width: 0;
+    height: 12px;
+    border-left: 2px solid var(--border);
+}
+.org-connector {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.org-connector::before {
+    content: '';
+    width: 2px;
+    height: 12px;
+    background: var(--border);
+}
+
+/* Kanban */
+.task-actions { margin-bottom: 16px; }
+.kanban { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.kanban-column {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    min-height: 300px;
+}
+.kanban-column h3 { font-size: 14px; color: var(--text-dim); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.kanban-cards { display: flex; flex-direction: column; gap: 8px; }
+.task-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 13px;
+}
+.task-card .task-desc { margin-bottom: 6px; }
+.task-card .task-meta { color: var(--text-dim); font-size: 11px; }
+
+/* Chat */
+.chat-layout { display: grid; grid-template-columns: 200px 1fr; gap: 16px; height: 500px; }
+.chat-sidebar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    overflow-y: auto;
+}
+.chat-sidebar h3 { font-size: 14px; color: var(--text-dim); margin-bottom: 12px; }
+.chat-agent-btn {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+.chat-agent-btn:hover { background: var(--surface-hover); }
+.chat-agent-btn.active { background: var(--surface-hover); border-color: var(--primary); }
+.chat-main {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.chat-messages {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+}
+.chat-placeholder { color: var(--text-dim); text-align: center; margin-top: 40%; }
+.chat-msg { margin-bottom: 12px; }
+.chat-msg .msg-sender { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+.chat-msg .msg-sender.user { color: var(--info); }
+.chat-msg .msg-sender.agent { color: var(--success); }
+.chat-msg .msg-text { font-size: 14px; line-height: 1.5; }
+.chat-input-row {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid var(--border);
+}
+.chat-input-row input {
+    flex: 1;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 14px;
+}
+.chat-input-row input:focus { outline: none; border-color: var(--primary); }
+
+/* Activity */
+.activity-feed { max-height: 600px; overflow-y: auto; }
+.activity-item {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+}
+.activity-item .activity-time { color: var(--text-dim); font-size: 11px; }
+.activity-item .activity-from { color: var(--primary); font-weight: 500; }
+
+/* Modal */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    max-width: 500px;
+}
+.modal h2 { margin-bottom: 16px; }
+.modal label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 4px; margin-top: 12px; }
+.modal input, .modal select, .modal textarea {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 14px;
+}
+.modal textarea { min-height: 80px; resize: vertical; }
+.modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .kanban { grid-template-columns: 1fr; }
+    .chat-layout { grid-template-columns: 1fr; }
+}

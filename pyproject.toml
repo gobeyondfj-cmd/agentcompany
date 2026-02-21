@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentcompany"
+version = "0.1.0"
+description = "Spin up an AI agent company - a business run by AI agents, managed by you"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "AgentCompany" }]
+keywords = ["ai", "agents", "llm", "automation", "business"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "anthropic>=0.39.0",
+    "openai>=1.0.0",
+    "typer[all]>=0.9.0",
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "websockets>=12.0",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "aiosqlite>=0.19.0",
+    "rich>=13.0",
+    "httpx>=0.27.0",
+    "jinja2>=3.1.0",
+]
+
+[project.scripts]
+agentcompany = "agentcompany.cli.app:app"
+
+[project.urls]
+Homepage = "https://github.com/gobeyondfj-cmd/agentcompany"
+Documentation = "https://github.com/gobeyondfj-cmd/agentcompany#readme"
+Issues = "https://github.com/gobeyondfj-cmd/agentcompany/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentcompany"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/agentcompany/roles" = "agentcompany/roles"
+"src/agentcompany/dashboard/static" = "agentcompany/dashboard/static"
