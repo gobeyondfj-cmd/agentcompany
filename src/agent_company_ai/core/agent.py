@@ -107,7 +107,7 @@ class Agent:
         ))
         return defs
 
-    async def think(self, task: Task) -> str:
+    async def think(self, task: Task, max_iterations: int = 15) -> str:
         """Process a task: reason, use tools, and produce a result."""
         if self.provider is None:
             task.fail("LLM provider not configured. Set an API key in .agent-company-ai/config.yaml")
@@ -127,12 +127,16 @@ class Agent:
                     f"You have been assigned the following task:\n\n"
                     f"**Task:** {task.description}\n\n"
                     f"Use your tools to complete this task. When finished, use the "
-                    f"report_result tool to submit your result."
+                    f"report_result tool to submit your result. IMPORTANT: Include "
+                    f"your full deliverable text in the 'result' parameter of "
+                    f"report_result — do NOT leave it empty."
                 ),
             ),
         ]
 
-        max_iterations = 15
+        # Track the last assistant text for fallback when report_result has empty result
+        last_assistant_text = ""
+
         for iteration in range(max_iterations):
             try:
                 response = await self.provider.complete(
@@ -147,10 +151,10 @@ class Agent:
             # Track cost
             self._track_usage(response.usage)
 
-            # If the model produced text, log it
+            # Capture assistant text
             if response.content:
                 logger.info(f"[{self.name}] thinks: {response.content[:200]}")
-                messages.append(LLMMessage(role="assistant", content=response.content))
+                last_assistant_text = response.content
 
             # No tool calls - we're done
             if not response.tool_calls:
@@ -159,7 +163,7 @@ class Agent:
                 return result
 
             # Process tool calls
-            # Add the assistant message with tool_calls
+            # Add single assistant message with both text and tool_calls
             messages.append(LLMMessage(
                 role="assistant",
                 content=response.content or "",
@@ -170,7 +174,9 @@ class Agent:
             ))
 
             for tc in response.tool_calls:
-                tool_result = await self._execute_tool(tc.name, tc.arguments, task)
+                tool_result = await self._execute_tool(
+                    tc.name, tc.arguments, task, last_assistant_text,
+                )
 
                 # Check if task is now terminal (report_result was called)
                 if task.is_terminal:
@@ -186,16 +192,24 @@ class Agent:
         task.fail("Exceeded maximum iterations without completing.")
         return "Failed: exceeded maximum iterations."
 
-    async def _execute_tool(self, tool_name: str, arguments: dict, task: Task) -> str:
+    async def _execute_tool(
+        self, tool_name: str, arguments: dict, task: Task, assistant_text: str = "",
+    ) -> str:
         """Execute a tool call and return the result string."""
         logger.info(f"[{self.name}] calling tool: {tool_name}({arguments})")
 
         if tool_name == "report_result":
             result = arguments.get("result", "")
+            # Fall back to assistant text if result is empty — LLMs often write
+            # the deliverable as message text and call report_result without it
+            if not result.strip() and assistant_text.strip():
+                result = assistant_text
             status = arguments.get("status", "done")
             if status == "done":
                 task.complete(result)
                 await self._register_artifact(task, "result", "text", content=result)
+                # Export deliverable to output directory as markdown
+                self._export_deliverable(task, result)
             else:
                 task.fail(result)
             await self.bus.send(
@@ -266,6 +280,23 @@ class Agent:
             (artifact_id, task.id, self.name, name, content, artifact_type),
         )
         return artifact
+
+    def _export_deliverable(self, task: Task, content: str) -> None:
+        """Write the deliverable text to a markdown file in the output dir."""
+        from agent_company_ai.tools.file_io import _output_dir
+        if not _output_dir or not content.strip():
+            return
+        try:
+            # Sanitize filename from task description
+            desc = task.description[:60].strip()
+            safe = "".join(c if c.isalnum() or c in " -_" else "_" for c in desc)
+            safe = safe.strip("_").replace(" ", "_")
+            filename = f"{self.name}_{safe}.md"
+            path = _output_dir / filename
+            path.write_text(content, encoding="utf-8")
+            logger.info(f"[{self.name}] exported deliverable to {path}")
+        except Exception as e:
+            logger.warning(f"[{self.name}] failed to export deliverable: {e}")
 
     @staticmethod
     def _infer_artifact_type(path: str) -> str:

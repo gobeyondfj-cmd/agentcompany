@@ -92,7 +92,7 @@ class AutonomousConfig(BaseModel):
 
     max_cycles: int = 5             # CEO review-and-replan cycles
     max_waves_per_cycle: int = 10   # delegation waves within one cycle
-    max_agent_iterations: int = 15  # tool-call loops per agent per task
+    max_agent_iterations: int = 25  # tool-call loops per agent per task
     max_total_tasks: int = 50       # hard cap on total tasks created
     max_time_seconds: int = 3600    # 1 hour wall-clock timeout (0 = unlimited)
     max_cost_usd: float = 0.0      # spending cap (0 = unlimited, requires usage tracking)

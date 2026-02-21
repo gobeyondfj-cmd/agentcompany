@@ -351,7 +351,8 @@ class Company:
             return task.result or ""
 
         await self._emit("task.started", task.to_dict())
-        result = await agent.think(task)
+        max_iter = self.config.autonomous.max_agent_iterations
+        result = await agent.think(task, max_iterations=max_iter)
 
         # Emit cost update
         await self._emit("cost.updated", self.cost_tracker.summary())
