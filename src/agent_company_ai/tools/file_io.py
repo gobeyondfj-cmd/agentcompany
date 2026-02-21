@@ -1,5 +1,6 @@
 """File I/O tools for reading and writing files in the workspace."""
 
+import shutil
 from pathlib import Path
 
 from agent_company_ai.tools.registry import tool
@@ -7,10 +8,37 @@ from agent_company_ai.tools.registry import tool
 # Workspace root is set at runtime by the Company
 _workspace: Path | None = None
 
+# Output directory for deliverables, set at runtime by the Company
+_output_dir: Path | None = None
+
 
 def set_workspace(path: Path) -> None:
     global _workspace
     _workspace = path
+
+
+def set_output_dir(path: Path) -> None:
+    global _output_dir
+    _output_dir = path
+
+
+def copy_to_output(relative_path: str, task_id: str) -> Path | None:
+    """Copy a workspace file into output/task-<id>/, returning the dest path."""
+    if _workspace is None or _output_dir is None:
+        return None
+    src = (_workspace / relative_path).resolve()
+    if not src.exists() or not src.is_file():
+        return None
+    dest_dir = _output_dir / f"task-{task_id}"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / src.name
+    # Handle name collisions with counter suffix
+    counter = 1
+    while dest.exists():
+        dest = dest_dir / f"{src.stem}_{counter}{src.suffix}"
+        counter += 1
+    shutil.copy2(str(src), str(dest))
+    return dest
 
 
 def _resolve(filepath: str) -> Path:

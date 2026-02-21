@@ -30,5 +30,9 @@ system_prompt: |
 default_tools:
   - file_io
   - code_exec
+  - check_balance
+  - get_wallet_address
+  - request_payment
+  - list_payments
 can_delegate_to: []
 reports_to: ceo

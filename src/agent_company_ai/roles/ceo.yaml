@@ -28,6 +28,9 @@ system_prompt: |
   Always be professional, proactive, and results-driven.
 default_tools:
   - web_search
+  - check_balance
+  - get_wallet_address
+  - list_payments
 can_delegate_to:
   - cto
   - marketer

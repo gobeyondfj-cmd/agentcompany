@@ -159,6 +159,27 @@ class Database:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 completed_at TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS wallets (
+                id TEXT PRIMARY KEY,
+                address TEXT NOT NULL,
+                keystore_path TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS payment_queue (
+                id TEXT PRIMARY KEY,
+                to_address TEXT NOT NULL,
+                amount TEXT NOT NULL,
+                token TEXT DEFAULT 'ETH',
+                chain TEXT DEFAULT 'ethereum',
+                reason TEXT DEFAULT '',
+                requested_by TEXT,
+                status TEXT DEFAULT 'pending',
+                tx_hash TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                executed_at TIMESTAMP
+            );
             """
         )
         await self._conn.commit()

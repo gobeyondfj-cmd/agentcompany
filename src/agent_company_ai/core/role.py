@@ -21,13 +21,20 @@ class Role:
     can_delegate_to: list[str] = field(default_factory=list)
     reports_to: str = "owner"
 
-    def build_system_prompt(self, company_name: str, team_members: list[str]) -> str:
+    def build_system_prompt(
+        self,
+        company_name: str,
+        team_members: list[str],
+        profit_engine_dna: str = "",
+    ) -> str:
         prompt = self.system_prompt.format(
             title=self.title,
             company_name=company_name,
             team_members=", ".join(team_members) if team_members else "None yet",
             delegates=", ".join(self.can_delegate_to) if self.can_delegate_to else "None",
         )
+        if profit_engine_dna:
+            prompt += profit_engine_dna
         return prompt
 
 

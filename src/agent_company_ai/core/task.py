@@ -93,6 +93,7 @@ class Task:
             "priority": self.priority,
             "parent_id": self.parent_id,
             "result": self.result,
+            "artifacts": self.artifacts,
             "subtask_count": len(self.subtasks),
             "subtasks_done": sum(1 for st in self.subtasks if st.is_terminal),
             "created_at": self.created_at.isoformat(),

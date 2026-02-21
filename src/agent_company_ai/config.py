@@ -98,6 +98,67 @@ class AutonomousConfig(BaseModel):
     max_cost_usd: float = 0.0      # spending cap (0 = unlimited, requires usage tracking)
 
 
+class WalletConfig(BaseModel):
+    """Blockchain wallet settings."""
+
+    enabled: bool = False
+    default_chain: str = "ethereum"
+
+
+class ProfitEngineConfig(BaseModel):
+    """Business DNA — defines how the company earns money and survives.
+
+    When ``enabled`` is *True* and at least one field is non-empty, the
+    formatted DNA string is injected into every agent's system prompt and
+    into the CEO's autonomous goal loop.
+    """
+
+    enabled: bool = False
+    mission: str = ""
+    revenue_streams: str = ""
+    target_customers: str = ""
+    pricing_model: str = ""
+    competitive_edge: str = ""
+    key_metrics: str = ""
+    cost_priorities: str = ""
+    additional_context: str = ""
+
+    def format_dna(self) -> str:
+        """Format the business DNA into a prompt-ready string.
+
+        Returns an empty string if the engine is disabled or every field is
+        blank, so callers can simply check truthiness.
+        """
+        if not self.enabled:
+            return ""
+
+        sections: list[str] = []
+        _fields = [
+            ("Mission", self.mission),
+            ("Revenue Streams", self.revenue_streams),
+            ("Target Customers", self.target_customers),
+            ("Pricing Model", self.pricing_model),
+            ("Competitive Edge", self.competitive_edge),
+            ("Key Metrics", self.key_metrics),
+            ("Cost Priorities", self.cost_priorities),
+            ("Additional Context", self.additional_context),
+        ]
+        for label, value in _fields:
+            if value.strip():
+                sections.append(f"- **{label}:** {value.strip()}")
+
+        if not sections:
+            return ""
+
+        return (
+            "\n\n--- COMPANY BUSINESS DNA (ProfitEngine) ---\n"
+            "The following defines how this company earns money and what matters most. "
+            "Factor this into every decision, recommendation, and deliverable.\n\n"
+            + "\n".join(sections)
+            + "\n--- END BUSINESS DNA ---"
+        )
+
+
 class CompanyConfig(BaseModel):
     """Root configuration object representing the entire company."""
 
@@ -106,6 +167,8 @@ class CompanyConfig(BaseModel):
     agents: list[AgentConfig] = Field(default_factory=list)
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     autonomous: AutonomousConfig = Field(default_factory=AutonomousConfig)
+    wallet: WalletConfig = Field(default_factory=WalletConfig)
+    profit_engine: ProfitEngineConfig = Field(default_factory=ProfitEngineConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -255,4 +318,48 @@ def list_available_roles() -> list[str]:
         return []
     return sorted(
         p.stem for p in _ROLES_DIR.glob("*.yaml") if p.is_file()
+    )
+
+
+# ---------------------------------------------------------------------------
+# ProfitEngine template helpers
+# ---------------------------------------------------------------------------
+
+_PROFIT_ENGINE_TEMPLATES_DIR = Path(__file__).resolve().parent / "profit_engine_templates"
+
+
+def load_profit_engine_template(name: str) -> dict:
+    """Load a ProfitEngine preset template by name.
+
+    Parameters
+    ----------
+    name:
+        The stem name of the template file (e.g. ``"saas"``, ``"ecommerce"``).
+
+    Returns
+    -------
+    dict
+        The parsed YAML contents of the template file.
+
+    Raises
+    ------
+    FileNotFoundError
+        If no matching template YAML exists.
+    """
+    template_path = _PROFIT_ENGINE_TEMPLATES_DIR / f"{name}.yaml"
+    if not template_path.exists():
+        raise FileNotFoundError(
+            f"No ProfitEngine template named '{name}'. "
+            f"Available: {list_profit_engine_templates()}"
+        )
+    with open(template_path, encoding="utf-8") as fh:
+        return yaml.safe_load(fh)
+
+
+def list_profit_engine_templates() -> list[str]:
+    """Return the names of all ProfitEngine preset templates."""
+    if not _PROFIT_ENGINE_TEMPLATES_DIR.is_dir():
+        return []
+    return sorted(
+        p.stem for p in _PROFIT_ENGINE_TEMPLATES_DIR.glob("*.yaml") if p.is_file()
     )

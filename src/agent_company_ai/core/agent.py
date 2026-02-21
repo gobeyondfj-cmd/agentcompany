@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from typing import TYPE_CHECKING
 
 from agent_company_ai.core.role import Role
@@ -12,6 +13,8 @@ from agent_company_ai.core.message_bus import MessageBus
 from agent_company_ai.core.cost_tracker import CostTracker
 from agent_company_ai.llm.base import LLMMessage, BaseLLMProvider, ToolDefinition
 from agent_company_ai.tools.registry import ToolRegistry
+from agent_company_ai.tools.file_io import copy_to_output
+from agent_company_ai.tools.wallet_tools import set_current_agent
 
 if TYPE_CHECKING:
     from agent_company_ai.storage.database import Database
@@ -32,6 +35,7 @@ class Agent:
         company_name: str = "My AI Company",
         team_members: list[str] | None = None,
         cost_tracker: CostTracker | None = None,
+        profit_engine_dna: str = "",
     ):
         self.name = name
         self.role = role
@@ -44,6 +48,7 @@ class Agent:
         self._system_prompt = role.build_system_prompt(
             company_name=company_name,
             team_members=team_members or [],
+            profit_engine_dna=profit_engine_dna,
         )
         self._tool_registry = ToolRegistry.get()
 
@@ -109,6 +114,9 @@ class Agent:
             return task.result or ""
         task.start()
         logger.info(f"[{self.name}] Starting task: {task.description}")
+
+        # Set current agent for tool attribution (e.g. wallet payment requests)
+        set_current_agent(self.name)
 
         # Build messages
         messages = [
@@ -187,6 +195,7 @@ class Agent:
             status = arguments.get("status", "done")
             if status == "done":
                 task.complete(result)
+                await self._register_artifact(task, "result", "text", content=result)
             else:
                 task.fail(result)
             await self.bus.send(
@@ -221,9 +230,54 @@ class Agent:
             return f"Error: Unknown tool '{tool_name}'"
 
         try:
-            return await tool.execute(**arguments)
+            result = await tool.execute(**arguments)
         except Exception as e:
             return f"Tool error: {e}"
+
+        # Track file artifacts produced by write_file
+        if tool_name == "write_file" and not result.startswith("Error"):
+            file_path = arguments.get("path", "")
+            dest = copy_to_output(file_path, task.id)
+            if dest:
+                artifact_type = self._infer_artifact_type(file_path)
+                await self._register_artifact(
+                    task, file_path, artifact_type, content=str(dest),
+                )
+
+        return result
+
+    async def _register_artifact(
+        self, task: Task, name: str, artifact_type: str, content: str | None = None,
+    ) -> dict:
+        """Insert an artifact into the DB and append to task.artifacts."""
+        artifact_id = uuid.uuid4().hex[:12]
+        artifact = {
+            "id": artifact_id,
+            "task_id": task.id,
+            "agent_id": self.name,
+            "name": name,
+            "artifact_type": artifact_type,
+            "content": content,
+        }
+        task.artifacts.append(artifact)
+        await self.db.execute(
+            "INSERT INTO artifacts (id, task_id, agent_id, name, content, artifact_type) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (artifact_id, task.id, self.name, name, content, artifact_type),
+        )
+        return artifact
+
+    @staticmethod
+    def _infer_artifact_type(path: str) -> str:
+        """Map a file extension to an artifact type."""
+        ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+        code_exts = {"py", "js", "ts", "jsx", "tsx", "java", "c", "cpp", "go", "rs", "rb", "sh", "html", "css"}
+        data_exts = {"json", "csv", "xml", "yaml", "yml", "toml", "sql", "tsv"}
+        if ext in code_exts:
+            return "code"
+        if ext in data_exts:
+            return "data"
+        return "file"
 
     async def chat(self, message: str) -> str:
         """Direct conversation with the human owner."""

@@ -10,8 +10,11 @@ from agent_company_ai.storage.models import (
     GoalRecord,
     GoalStatus,
     MessageRecord,
+    PaymentRecord,
+    PaymentStatus,
     TaskRecord,
     TaskStatus,
+    WalletRecord,
 )
 
 __all__ = [
@@ -25,6 +28,9 @@ __all__ = [
     "GoalRecord",
     "GoalStatus",
     "MessageRecord",
+    "PaymentRecord",
+    "PaymentStatus",
     "TaskRecord",
     "TaskStatus",
+    "WalletRecord",
 ]

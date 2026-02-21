@@ -155,3 +155,48 @@ class GoalRecord(BaseModel):
     @classmethod
     def new_id(cls) -> str:
         return _new_id()
+
+
+# ---------------------------------------------------------------------------
+# Wallet / Payment models
+# ---------------------------------------------------------------------------
+
+class PaymentStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SENT = "sent"
+    FAILED = "failed"
+
+
+class WalletRecord(BaseModel):
+    """Maps to the ``wallets`` table."""
+
+    id: str = Field(default_factory=_new_id)
+    address: str
+    keystore_path: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    @classmethod
+    def new_id(cls) -> str:
+        return _new_id()
+
+
+class PaymentRecord(BaseModel):
+    """Maps to the ``payment_queue`` table."""
+
+    id: str = Field(default_factory=_new_id)
+    to_address: str
+    amount: str  # stored as string to preserve decimal precision
+    token: str = "ETH"
+    chain: str = "ethereum"
+    reason: str = ""
+    requested_by: Optional[str] = None
+    status: PaymentStatus = PaymentStatus.PENDING
+    tx_hash: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    executed_at: Optional[datetime] = None
+
+    @classmethod
+    def new_id(cls) -> str:
+        return _new_id()

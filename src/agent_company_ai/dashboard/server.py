@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -189,6 +189,109 @@ async def api_messages():
         }
         for m in history
     ]
+
+
+@_app.get("/api/artifacts")
+async def api_artifacts(task_id: str | None = Query(None)):
+    if not _company:
+        return []
+    return await _company.get_artifacts(task_id=task_id)
+
+
+@_app.get("/api/artifacts/{artifact_id}")
+async def api_artifact(artifact_id: str):
+    if not _company:
+        return {"error": "Company not loaded"}
+    row = await _company.db.fetch_one(
+        "SELECT * FROM artifacts WHERE id = ?", (artifact_id,)
+    )
+    if row is None:
+        return {"error": "Artifact not found"}
+    return row
+
+
+@_app.get("/api/output-dir")
+async def api_output_dir():
+    if not _company:
+        return {"error": "Company not loaded"}
+    return {"output_dir": str(_company.output_dir)}
+
+
+# ------------------------------------------------------------------
+# ProfitEngine API
+# ------------------------------------------------------------------
+
+
+@_app.get("/api/profit-engine")
+async def api_profit_engine():
+    """Return the current ProfitEngine configuration."""
+    if not _company:
+        return {"error": "Company not loaded"}
+    pe = _company.config.profit_engine
+    return pe.model_dump()
+
+
+@_app.post("/api/profit-engine")
+async def api_profit_engine_update(body: dict):
+    """Update ProfitEngine fields and save to config.yaml."""
+    if not _company:
+        return {"error": "Company not loaded"}
+
+    from agent_company_ai.config import save_config
+
+    pe = _company.config.profit_engine
+    valid_fields = {
+        "enabled", "mission", "revenue_streams", "target_customers",
+        "pricing_model", "competitive_edge", "key_metrics",
+        "cost_priorities", "additional_context",
+    }
+    for key, value in body.items():
+        if key in valid_fields:
+            setattr(pe, key, value)
+
+    save_config(_company.config, _company.company_dir / "config.yaml")
+    return pe.model_dump()
+
+
+@_app.get("/api/profit-engine/templates")
+async def api_profit_engine_templates():
+    """List all ProfitEngine templates with their full content."""
+    from agent_company_ai.config import list_profit_engine_templates, load_profit_engine_template
+
+    result = []
+    for name in list_profit_engine_templates():
+        tmpl = load_profit_engine_template(name)
+        result.append(tmpl)
+    return result
+
+
+# ------------------------------------------------------------------
+# Wallet API (read-only)
+# ------------------------------------------------------------------
+
+
+@_app.get("/api/wallet/balance")
+async def api_wallet_balance(chain: str | None = Query(None)):
+    if not _company:
+        return {"error": "Company not loaded"}
+    return _company.wallet_manager.get_balance(chain_name=chain)
+
+
+@_app.get("/api/wallet/address")
+async def api_wallet_address():
+    if not _company:
+        return {"error": "Company not loaded"}
+    addr = _company.wallet_manager.address
+    if addr is None:
+        return {"address": None, "error": "No wallet found"}
+    return {"address": addr}
+
+
+@_app.get("/api/wallet/payments")
+async def api_wallet_payments(status: str | None = Query(None)):
+    if not _company:
+        return {"error": "Company not loaded"}
+    return await _company.wallet_manager.list_payments(status=status)
 
 
 # ------------------------------------------------------------------

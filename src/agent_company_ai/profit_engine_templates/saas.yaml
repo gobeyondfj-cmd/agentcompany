@@ -1,0 +1,11 @@
+name: saas
+display_name: "SaaS (Software as a Service)"
+description: "Recurring subscription revenue from hosted software products."
+mission: "Build and scale a software product that solves a recurring problem, delivered as a subscription service with predictable recurring revenue."
+revenue_streams: "Monthly/annual subscriptions (tiered plans: free/starter/pro/enterprise), usage-based overages, add-on modules, professional services and onboarding fees."
+target_customers: "Businesses or individuals who need an ongoing software solution — segmented by company size (SMB, mid-market, enterprise) or by vertical."
+pricing_model: "Tiered subscription pricing with free trial or freemium entry point. Higher tiers unlock more features, seats, or usage. Annual plans discounted to improve retention."
+competitive_edge: "Product-led growth, fast iteration cycles, strong onboarding UX, and deep integrations that increase switching costs."
+key_metrics: "MRR/ARR, churn rate, LTV:CAC ratio, net revenue retention (NRR), trial-to-paid conversion, activation rate, NPS."
+cost_priorities: "Engineering and product development first. Keep infrastructure costs scalable. Invest in customer success to reduce churn. Marketing spend tied to CAC payback period."
+additional_context: ""

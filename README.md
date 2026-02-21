@@ -240,6 +240,12 @@ can_delegate_to: []
 reports_to: cto
 ```
 
+## Donate
+
+If this project is useful to you, consider supporting development:
+
+**ETH:** `0x0448F896Fc878DF56046Aa0090D05Dd01F28b338`
+
 ## Enterprise Customization & Consulting
 
 **"We build AI agent workforce for your company"**

@@ -25,7 +25,9 @@ from agent_company_ai.core.role import load_role
 from agent_company_ai.core.task import Task, TaskBoard, TaskStatus
 from agent_company_ai.llm.router import LLMRouter
 from agent_company_ai.storage.database import Database, get_database
-from agent_company_ai.tools.file_io import set_workspace
+from agent_company_ai.tools.file_io import set_workspace, set_output_dir
+from agent_company_ai.tools.wallet_tools import set_wallet_manager
+from agent_company_ai.wallet.manager import WalletManager
 
 logger = logging.getLogger("agent_company_ai.company")
 
@@ -60,6 +62,17 @@ class Company:
         workspace = company_dir.parent
         set_workspace(workspace)
 
+        # Set output directory for deliverables
+        self.output_dir = company_dir / "output"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        set_output_dir(self.output_dir)
+
+        # Wallet manager
+        self.wallet_dir = company_dir / "wallet"
+        self.wallet_manager = WalletManager(self.wallet_dir, db)
+        if config.wallet.enabled and self.wallet_manager.has_wallet():
+            set_wallet_manager(self.wallet_manager)
+
         # Global message listener for persistence
         self.bus.set_global_listener(self._on_bus_message)
 
@@ -87,6 +100,10 @@ class Company:
                 await company._add_agent_from_config(agent_cfg)
             except Exception as e:
                 logger.warning(f"Failed to restore agent {agent_cfg.name}: {e}")
+
+        # Register wallet in DB if it exists
+        if company.wallet_manager.has_wallet():
+            await company.wallet_manager.register_wallet_in_db()
 
         return company
 
@@ -197,6 +214,7 @@ class Company:
         team_members = [
             f"{a.name} ({a.role})" for a in self.config.agents if a.name != cfg.name
         ]
+        profit_engine_dna = self.config.profit_engine.format_dna()
         agent = Agent(
             name=cfg.name,
             role=role,
@@ -206,6 +224,7 @@ class Company:
             company_name=self.config.name,
             team_members=team_members,
             cost_tracker=self.cost_tracker,
+            profit_engine_dna=profit_engine_dna,
         )
         self.agents[cfg.name] = agent
         return agent
@@ -330,10 +349,11 @@ class Company:
         await self._emit("cost.updated", self.cost_tracker.summary())
 
         # Update DB
+        artifacts_json = json.dumps(task.artifacts)
         await self.db.execute(
-            "UPDATE tasks SET status = ?, result = ?, updated_at = CURRENT_TIMESTAMP "
+            "UPDATE tasks SET status = ?, result = ?, artifacts_json = ?, updated_at = CURRENT_TIMESTAMP "
             "WHERE id = ?",
-            (task.status.value, task.result, task.id),
+            (task.status.value, task.result, artifacts_json, task.id),
         )
         await self._emit("task.updated", task.to_dict())
 
@@ -450,6 +470,15 @@ class Company:
             })
 
             # --- Step 1: CEO plans (or re-plans) ---
+            profit_context = ""
+            profit_dna = self.config.profit_engine.format_dna()
+            if profit_dna:
+                profit_context = (
+                    f"\n\nBUSINESS MODEL CONTEXT:\n"
+                    f"All planning and review must align with the company's business DNA.\n"
+                    f"{profit_dna}\n"
+                )
+
             progress_context = ""
             if cycle > 0:
                 progress_context = (
@@ -469,6 +498,7 @@ class Company:
                     f"for your team. Delegate each task to the appropriate team member "
                     f"using the delegate_task tool. Consider what each department needs "
                     f"to do. After delegating all tasks, report a summary of the plan."
+                    f"{profit_context}"
                     f"{progress_context}"
                 ),
                 assignee=ceo.name,
@@ -514,6 +544,7 @@ class Company:
                     f"and describe what still needs to be done. (The company will run another cycle.)\n"
                     f"- If IMPOSSIBLE to achieve: report_result with status='failed' and "
                     f"explain why.\n"
+                    f"{profit_context}"
                 ),
                 assignee=ceo.name,
             )
@@ -604,7 +635,16 @@ class Company:
             "tasks": self.task_board.summary(),
             "running": self._running,
             "cost": self.cost_tracker.summary(),
+            "output_dir": str(self.output_dir),
         }
+
+    async def get_artifacts(self, task_id: str | None = None) -> list[dict]:
+        """Query the artifacts table, optionally filtered by task_id."""
+        if task_id:
+            return await self.db.fetch_all(
+                "SELECT * FROM artifacts WHERE task_id = ? ORDER BY created_at", (task_id,)
+            )
+        return await self.db.fetch_all("SELECT * FROM artifacts ORDER BY created_at")
 
     async def shutdown(self) -> None:
         """Clean shutdown."""

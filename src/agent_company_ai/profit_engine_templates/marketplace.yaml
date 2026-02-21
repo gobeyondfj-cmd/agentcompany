@@ -1,0 +1,11 @@
+name: marketplace
+display_name: "Marketplace / Platform"
+description: "Two-sided platform connecting buyers and sellers, earning through transaction fees and premium services."
+mission: "Build a trusted platform that connects supply and demand, reducing friction for both sides while earning a fee on every transaction."
+revenue_streams: "Transaction fees (percentage of GMV), listing fees, promoted listings and advertising, premium seller tools, subscription tiers for power sellers, payment processing fees."
+target_customers: "Two-sided: sellers/providers who need distribution and buyers/consumers who need selection, convenience, or price transparency."
+pricing_model: "Commission on each transaction (typically 5-20%). Free to list with optional paid promotion. Tiered seller subscriptions for advanced tools and lower commission rates."
+competitive_edge: "Network effects — more sellers attract more buyers and vice versa. Trust and safety systems, seamless payments, strong dispute resolution."
+key_metrics: "GMV, take rate, liquidity (matches per listing), buyer-to-seller ratio, repeat transaction rate, time to first transaction, seller retention."
+cost_priorities: "Platform engineering and trust/safety first. Invest heavily in supply acquisition early. Balance marketplace subsidies with path to profitability. Customer support scales with GMV."
+additional_context: ""
