@@ -39,7 +39,17 @@ agent-company-ai hire developer --name Carol
 agent-company-ai hire marketer --name Dave
 ```
 
-### 4. Run autonomously
+### 4. Define your business model
+
+Tell your agents how the company makes money:
+
+```bash
+agent-company-ai profit-engine setup --template saas
+```
+
+This injects your business DNA into every agent's decision-making. See [ProfitEngine](#profitengine--business-dna) below.
+
+### 5. Run autonomously
 
 Give the CEO a goal and watch the company run:
 
@@ -70,9 +80,12 @@ agent-company-ai run "Launch MVP" --cycles 3 --timeout 600 --max-tasks 20
 | `broadcast "<msg>"` | Message all agents |
 | `dashboard` | Launch web dashboard |
 | `status` | Company overview |
+| `output` | List deliverables produced by agents |
 | `roles` | List available roles |
 | `companies` | List all companies in this directory |
 | `destroy` | Permanently delete a company |
+| `profit-engine <cmd>` | Configure business model DNA ([details](#profitengine--business-dna)) |
+| `wallet <cmd>` | Manage blockchain wallet ([details](#blockchain-wallet)) |
 
 ### Global Options
 
@@ -86,6 +99,150 @@ You can also set the company via environment variable:
 export AGENT_COMPANY_NAME=my-startup
 agent-company-ai team  # operates on my-startup
 ```
+
+## ProfitEngine — Business DNA
+
+ProfitEngine lets you define your company's business model — how it earns money, who it serves, and what matters most. This "business DNA" is injected into **every agent's system prompt** and into the **CEO's goal loop**, so all decisions align with your business model.
+
+### Setup
+
+Start from a preset template or from scratch:
+
+```bash
+# Interactive wizard with a preset
+agent-company-ai profit-engine setup --template saas
+
+# Fully interactive — choose a template then customize each field
+agent-company-ai profit-engine setup
+```
+
+The wizard walks you through 8 fields:
+
+| Field | What it defines |
+|-------|----------------|
+| **Mission** | The company's core purpose |
+| **Revenue Streams** | How the company makes money |
+| **Target Customers** | Who the ideal customers are |
+| **Pricing Model** | How products/services are priced |
+| **Competitive Edge** | What sets the company apart |
+| **Key Metrics** | What metrics define success |
+| **Cost Priorities** | Where money should be spent first |
+| **Additional Context** | Any other business context |
+
+### Templates
+
+6 preset templates to start from:
+
+| Template | Business Model |
+|----------|---------------|
+| `saas` | SaaS (Software as a Service) — recurring subscriptions |
+| `ecommerce` | E-Commerce — online retail |
+| `marketplace` | Marketplace / Platform — transaction fees |
+| `agency` | Agency / Services — project and retainer fees |
+| `consulting` | Consulting — advisory and engagement fees |
+| `content` | Content / Media — ads, subscriptions, licensing |
+
+```bash
+agent-company-ai profit-engine templates  # list all templates
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `profit-engine setup` | Interactive wizard to configure business DNA |
+| `profit-engine show` | Display current DNA |
+| `profit-engine edit <field>` | Edit a single field |
+| `profit-engine templates` | List available preset templates |
+| `profit-engine disable` | Disable DNA injection (config preserved) |
+
+### How it works
+
+Once configured, the business DNA is automatically:
+
+- **Appended to every agent's system prompt** — so developers, marketers, sales, and support all understand the business model
+- **Injected into the CEO's planning and review tasks** — so autonomous mode goals are planned and evaluated through the lens of your business model
+
+The DNA is stored in `config.yaml` under the `profit_engine` key. No new database tables — just config.
+
+```yaml
+# .agent-company-ai/default/config.yaml
+profit_engine:
+  enabled: true
+  mission: "Build and scale a SaaS product..."
+  revenue_streams: "Monthly/annual subscriptions..."
+  target_customers: "SMB to enterprise..."
+  pricing_model: "Tiered subscription pricing..."
+  competitive_edge: "Product-led growth..."
+  key_metrics: "MRR/ARR, churn rate, LTV:CAC..."
+  cost_priorities: "Engineering first..."
+  additional_context: ""
+```
+
+### Dashboard API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/profit-engine` | Return current ProfitEngine config |
+| `POST /api/profit-engine` | Update fields and save to config |
+| `GET /api/profit-engine/templates` | List all templates with content |
+
+## Blockchain Wallet
+
+Built-in Ethereum wallet with multi-chain support. Agents can request payments (with human approval), and you can send tokens directly from the CLI.
+
+### Setup
+
+```bash
+agent-company-ai wallet create
+```
+
+Creates an encrypted keystore (password-protected). One address works across all supported chains.
+
+### Supported Chains
+
+| Chain | Native Token |
+|-------|-------------|
+| Ethereum | ETH |
+| Base | ETH |
+| Arbitrum | ETH |
+| Polygon | MATIC |
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `wallet create` | Generate a new wallet with encrypted keystore |
+| `wallet address` | Show the company wallet address |
+| `wallet balance` | Show balances across all chains |
+| `wallet balance --chain base` | Show balance on a specific chain |
+| `wallet send <amount> --to <addr> --chain <chain>` | Send native tokens (requires password) |
+| `wallet payments` | Show the payment approval queue |
+| `wallet approve <id>` | Approve and send a pending payment |
+| `wallet reject <id>` | Reject a pending payment |
+
+### Agent Payments
+
+Agents with wallet tools (`check_balance`, `get_wallet_address`, `list_payments`, `request_payment`) can request payments during task execution. All payment requests go into an approval queue — nothing is sent without your explicit approval.
+
+```bash
+# Check pending payments
+agent-company-ai wallet payments --status pending
+
+# Approve a payment
+agent-company-ai wallet approve abc123
+
+# Reject a payment
+agent-company-ai wallet reject abc123
+```
+
+### Dashboard API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/wallet/balance` | Balances (optional `?chain=` filter) |
+| `GET /api/wallet/address` | Wallet address |
+| `GET /api/wallet/payments` | Payment queue (optional `?status=` filter) |
 
 ## Multi-Company Support
 
@@ -189,6 +346,8 @@ Features:
 - **Activity Feed** - Real-time event stream via WebSocket
 - **Autonomous Mode** - Set goals and monitor progress from the UI
 - **Cost Tracker** - Real-time API cost breakdown by agent and model
+- **ProfitEngine** - View and edit business DNA from the dashboard
+- **Wallet** - Check balances and view payment queue
 
 ## Built-in Agent Tools
 
@@ -202,6 +361,10 @@ Agents have access to these tools based on their role:
 | **shell** | Run shell commands (30s timeout, dangerous patterns blocked) |
 | **delegate_task** | Delegate work to other agents |
 | **report_result** | Submit task results |
+| **check_balance** | Check wallet balance (wallet-enabled agents) |
+| **get_wallet_address** | Get company wallet address (wallet-enabled agents) |
+| **list_payments** | View payment queue (wallet-enabled agents) |
+| **request_payment** | Request a payment — goes to approval queue (wallet-enabled agents) |
 
 ## Autonomous Mode
 
@@ -211,6 +374,8 @@ The company runs in CEO-driven cycles:
 2. **Execute** - Agents work on tasks in parallel waves
 3. **Review** - CEO evaluates progress and decides: DONE, CONTINUE, or FAILED
 4. **Loop** - Repeat until goal achieved or limits reached
+
+When ProfitEngine is enabled, the CEO factors business DNA into every planning and review decision.
 
 **Configurable limits** (in `config.yaml` or via CLI flags):
 - `max_cycles: 5` — CEO review loops
@@ -250,8 +415,8 @@ If this project is useful to you, consider supporting development:
 
 **"We build AI agent workforce for your company"**
 
-- **Implementation fee:** $10k–100k+
-- **Ongoing support:** $2k–10k/month
+- **Implementation fee:** $10k-100k+
+- **Ongoing support:** $2k-10k/month
 
 Please contact gobeyondfj@gmail.com
 
