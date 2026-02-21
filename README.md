@@ -155,6 +155,15 @@ Agents have access to these tools based on their role:
 - **delegate_task** - Delegate work to other agents
 - **report_result** - Submit task results
 
+## Enterprise Customization & Consulting
+
+**"We build AI agent workforce for your company"**
+
+- **Implementation fee:** $10k–100k+
+- **Ongoing support:** $2k–10k/month
+
+Please contact gobeyondfj@gmail.com
+
 ## License
 
 MIT
