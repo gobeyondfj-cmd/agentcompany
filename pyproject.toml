@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ai-agentcompany"
+name = "agent-company-ai"
 version = "0.1.0"
 description = "Spin up an AI agent company - a business run by AI agents, managed by you"
 readme = "README.md"
