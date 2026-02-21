@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -114,21 +115,90 @@ class CompanyConfig(BaseModel):
 _ROLES_DIR = Path(__file__).resolve().parent / "roles"
 
 
-def get_company_dir(base: Path | None = None) -> Path:
-    """Return the ``.agent-company-ai/`` directory, creating it if needed.
+def slugify(name: str) -> str:
+    """Convert a company name to a filesystem-safe slug.
+
+    ``"My Startup"`` → ``"my-startup"``, ``""`` → ``"default"``.
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return slug or "default"
+
+
+def get_root_dir(base: Path | None = None) -> Path:
+    """Return the ``.agent-company-ai/`` root directory (no auto-create).
 
     Parameters
     ----------
     base:
-        The parent directory that contains (or will contain) the
-        ``.agent-company-ai/`` folder.  Defaults to the current working
-        directory.
+        Parent directory that contains (or will contain) the root folder.
+        Defaults to the current working directory.
     """
     if base is None:
         base = Path.cwd()
-    company_dir = base / ".agent-company-ai"
-    company_dir.mkdir(parents=True, exist_ok=True)
+    return base / ".agent-company-ai"
+
+
+def get_company_dir(
+    company: str = "default",
+    base: Path | None = None,
+    *,
+    create: bool = True,
+) -> Path:
+    """Return the directory for a specific company, e.g. ``.agent-company-ai/<slug>/``.
+
+    Parameters
+    ----------
+    company:
+        Company slug (e.g. ``"default"``, ``"my-startup"``).
+    base:
+        Parent directory that contains (or will contain) the
+        ``.agent-company-ai/`` folder.  Defaults to the current working
+        directory.
+    create:
+        If *True* (default), create the directory tree if it doesn't exist.
+        Pass *False* for read-only lookups.
+    """
+    root = get_root_dir(base)
+    company_dir = root / slugify(company)
+    if create:
+        company_dir.mkdir(parents=True, exist_ok=True)
     return company_dir
+
+
+def list_companies(base: Path | None = None) -> list[str]:
+    """Return slugs of all companies (subdirs containing ``config.yaml``)."""
+    root = get_root_dir(base)
+    if not root.is_dir():
+        return []
+    return sorted(
+        d.name
+        for d in root.iterdir()
+        if d.is_dir() and (d / "config.yaml").exists()
+    )
+
+
+def maybe_migrate_legacy_layout(base: Path | None = None) -> bool:
+    """Migrate a flat ``.agent-company-ai/`` layout into ``default/``.
+
+    Old layout had ``config.yaml`` and ``company.db`` directly inside the
+    root directory.  This moves them into a ``default/`` subdirectory.
+    Idempotent — returns *True* if a migration actually happened.
+    """
+    root = get_root_dir(base)
+    legacy_config = root / "config.yaml"
+    if not legacy_config.exists():
+        return False
+    # Already migrated if default/ sub-dir exists with config
+    default_dir = root / "default"
+    if default_dir.exists() and (default_dir / "config.yaml").exists():
+        return False
+    default_dir.mkdir(parents=True, exist_ok=True)
+    # Move config.yaml, company.db, and any WAL/SHM files
+    for pattern in ("config.yaml", "company.db", "company.db-wal", "company.db-shm"):
+        src = root / pattern
+        if src.exists():
+            shutil.move(str(src), str(default_dir / pattern))
+    return True
 
 
 def load_config(path: Path) -> CompanyConfig:

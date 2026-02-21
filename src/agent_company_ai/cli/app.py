@@ -18,6 +18,23 @@ app = typer.Typer(
 )
 console = Console()
 
+_selected_company: str = "default"
+
+
+@app.callback()
+def main(
+    company: str = typer.Option(
+        "default",
+        "--company",
+        "-C",
+        help="Company slug to operate on",
+        envvar="AGENT_COMPANY_NAME",
+    ),
+):
+    """Spin up an AI agent company - a business run by AI agents, managed by you."""
+    global _selected_company
+    _selected_company = company
+
 
 def _run(coro):
     """Run an async function synchronously."""
@@ -40,19 +57,133 @@ def _run(coro):
 @app.command()
 def init(
     name: str = typer.Option("My AI Company", "--name", "-n", help="Company name"),
+    provider: str = typer.Option(None, "--provider", "-p", help="LLM provider (anthropic, openai, deepseek, mimo, kimi, qwen, minimax, ollama, together, groq, or openai-compat)"),
+    api_key: str = typer.Option(None, "--api-key", "-k", help="API key for the chosen provider"),
+    model: str = typer.Option(None, "--model", "-m", help="Model name (defaults per provider)"),
+    base_url: str = typer.Option(None, "--base-url", "-b", help="Base URL for OpenAI-compatible endpoints"),
 ):
     """Initialize a new AI agent company in the current directory."""
     from agent_company_ai.core.company import Company
+    from agent_company_ai.config import save_config, LLMProviderConfig
+
+    # Provider presets: maps user-facing name to (config provider, base_url, default_model, env_var)
+    PROVIDER_PRESETS = {
+        "anthropic":     ("anthropic", None,                                     "claude-sonnet-4-5-20250929",              "ANTHROPIC_API_KEY"),
+        "openai":        ("openai",   None,                                     "gpt-4o",                                  "OPENAI_API_KEY"),
+        "deepseek":      ("openai",   "https://api.deepseek.com/v1",           "deepseek-r1",                             "DEEPSEEK_API_KEY"),
+        "mimo":          ("openai",   "https://api.deepseek.com/v1",           "mimo-7b-rl",                              "DEEPSEEK_API_KEY"),
+        "kimi":          ("openai",   "https://api.moonshot.cn/v1",            "kimi-k2-0711-preview",                    "MOONSHOT_API_KEY"),
+        "qwen":          ("openai",   "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-max",                    "DASHSCOPE_API_KEY"),
+        "minimax":       ("openai",   "https://api.minimaxi.chat/v1",        "MiniMax-M1",                              "MINIMAX_API_KEY"),
+        "ollama":        ("openai",   "http://localhost:11434/v1",             "llama3.1",                                None),
+        "together":      ("openai",   "https://api.together.xyz/v1",           "meta-llama/Llama-3.3-70B-Instruct-Turbo", "TOGETHER_API_KEY"),
+        "groq":          ("openai",   "https://api.groq.com/openai/v1",       "llama-3.3-70b-versatile",                 "GROQ_API_KEY"),
+        "openai-compat": ("openai",   None,                                    None,                                      None),
+    }
+
+    # Interactive provider selection when --provider not given
+    chosen_provider = provider
+    chosen_key = api_key
+    chosen_model = model
+    chosen_base_url = base_url
+
+    if chosen_provider is None:
+        console.print("\n[bold]Configure LLM provider[/bold]")
+        console.print("  [cyan] [1][/cyan] Anthropic (default)")
+        console.print("  [cyan] [2][/cyan] OpenAI")
+        console.print("  [cyan] [3][/cyan] DeepSeek (DeepSeek-R1, etc.)")
+        console.print("  [cyan] [4][/cyan] MiMo (DeepSeek MiMo reasoning)")
+        console.print("  [cyan] [5][/cyan] Kimi (Moonshot AI)")
+        console.print("  [cyan] [6][/cyan] Qwen (Alibaba Cloud)")
+        console.print("  [cyan] [7][/cyan] MiniMax (MiniMax-M1)")
+        console.print("  [cyan] [8][/cyan] Ollama (local, no API key needed)")
+        console.print("  [cyan] [9][/cyan] Together AI (Llama, Mixtral, etc.)")
+        console.print("  [cyan][10][/cyan] Groq (fast open-source inference)")
+        console.print("  [cyan][11][/cyan] Other OpenAI-compatible endpoint")
+        console.print("  [cyan][12][/cyan] Skip for now")
+        choice = console.input("\nChoose provider [1-12]: ").strip()
+        provider_map = {
+            "1": "anthropic", "2": "openai", "3": "deepseek",
+            "4": "mimo", "5": "kimi", "6": "qwen", "7": "minimax",
+            "8": "ollama", "9": "together", "10": "groq",
+            "11": "openai-compat",
+        }
+        if choice in ("12", ""):
+            chosen_provider = None
+        else:
+            chosen_provider = provider_map.get(choice, "anthropic")
+
+    if chosen_provider and chosen_provider in PROVIDER_PRESETS:
+        preset = PROVIDER_PRESETS[chosen_provider]
+        config_provider, preset_base_url, preset_model, env_var = preset
+
+        # Base URL: use flag > preset > prompt (for openai-compat)
+        if not chosen_base_url:
+            if preset_base_url:
+                chosen_base_url = preset_base_url
+            elif chosen_provider == "openai-compat":
+                chosen_base_url = console.input("Base URL (e.g. http://localhost:8000/v1): ").strip()
+
+        # API key: use flag > prompt > env var placeholder
+        if not chosen_key:
+            if chosen_provider == "ollama":
+                chosen_key = "ollama"  # Ollama doesn't need a real key
+            elif env_var:
+                chosen_key = console.input(
+                    f"API key (or press Enter to use ${{{env_var}}}): "
+                ).strip() or f"${{{env_var}}}"
+            else:
+                chosen_key = console.input("API key (or press Enter to skip): ").strip() or ""
+
+        # Model: use flag > prompt with preset default
+        if not chosen_model:
+            if preset_model:
+                entered = console.input(
+                    f"Model [{preset_model}]: "
+                ).strip()
+                chosen_model = entered or preset_model
+            else:
+                chosen_model = console.input("Model name: ").strip()
 
     async def _init():
-        company = await Company.init(name=name)
-        return company
+        company = await Company.init(name=name, company=_selected_company)
+        company_dir = company.company_dir
 
-    company = _run(_init())
+        # Apply LLM config if a provider was selected
+        if chosen_provider and chosen_provider in PROVIDER_PRESETS:
+            config_provider = PROVIDER_PRESETS[chosen_provider][0]
+            provider_config = LLMProviderConfig(
+                api_key=chosen_key or "",
+                model=chosen_model or "",
+                base_url=chosen_base_url,
+            )
+            company.config.llm.default_provider = config_provider
+            if config_provider == "anthropic":
+                company.config.llm.anthropic = provider_config
+            else:
+                company.config.llm.openai = provider_config
+            save_config(company.config, company_dir / "config.yaml")
+
+        await company.shutdown()
+        return company_dir
+
+    company_dir = _run(_init())
+
+    # Build output message
+    provider_line = ""
+    if chosen_provider:
+        display_provider = chosen_provider
+        if chosen_base_url and chosen_provider not in ("anthropic", "openai"):
+            display_provider = f"{chosen_provider} ({chosen_base_url})"
+        provider_line = f"Provider: [cyan]{display_provider}[/cyan] (model: {chosen_model})\n"
+    else:
+        provider_line = "Provider: [yellow]not configured[/yellow] — edit config.yaml or re-run init\n"
+
     console.print(Panel(
         f"[bold green]Company '{name}' initialized![/bold green]\n\n"
-        f"Directory: {company.company_dir}\n"
-        f"Config: {company.company_dir / 'config.yaml'}\n\n"
+        f"Directory: {company_dir}\n"
+        f"Config: {company_dir / 'config.yaml'}\n"
+        f"{provider_line}\n"
         f"Next steps:\n"
         f"  agent-company-ai hire ceo --name Alice\n"
         f"  agent-company-ai hire developer --name Bob\n"
@@ -77,7 +208,7 @@ def hire(
     from agent_company_ai.core.company import Company
 
     async def _hire():
-        company = await Company.load()
+        company = await Company.load(company=_selected_company)
         agent = await company.hire(role, agent_name=name, provider=provider, model=model)
         await company.shutdown()
         return agent
@@ -99,7 +230,7 @@ def fire(
     from agent_company_ai.core.company import Company
 
     async def _fire():
-        company = await Company.load()
+        company = await Company.load(company=_selected_company)
         await company.fire(name)
         await company.shutdown()
 
@@ -118,7 +249,7 @@ def team():
     from agent_company_ai.core.company import Company
 
     async def _team():
-        company = await Company.load()
+        company = await Company.load(company=_selected_company)
         agents = company.list_agents()
         await company.shutdown()
         return company.config.name, agents
@@ -155,7 +286,7 @@ def assign(
     from agent_company_ai.core.company import Company
 
     async def _assign():
-        company = await Company.load()
+        company = await Company.load(company=_selected_company)
         t = await company.assign(task, assignee=to)
         # Wait for task to complete if assigned
         if to:
@@ -194,7 +325,7 @@ def tasks():
     from agent_company_ai.core.company import Company
 
     async def _tasks():
-        company = await Company.load()
+        company = await Company.load(company=_selected_company)
         all_tasks = company.task_board.list_all()
         await company.shutdown()
         return all_tasks
@@ -244,7 +375,7 @@ def chat(
     from agent_company_ai.core.company import Company
 
     async def _chat():
-        company = await Company.load()
+        company = await Company.load(company=_selected_company)
         agent = company.get_agent(agent_name)
         if not agent:
             console.print(f"[red]No agent named '{agent_name}'.[/red]")
@@ -286,7 +417,7 @@ def broadcast(
     from agent_company_ai.core.company import Company
 
     async def _broadcast():
-        company = await Company.load()
+        company = await Company.load(company=_selected_company)
         await company.broadcast(message)
         await company.shutdown()
 
@@ -316,7 +447,7 @@ def run(
     from agent_company_ai.core.company import Company
 
     async def _run_goal():
-        company = await Company.load()
+        company = await Company.load(company=_selected_company)
 
         # Apply CLI overrides to config
         if max_cycles is not None:
@@ -365,7 +496,7 @@ def status():
     from agent_company_ai.core.company import Company
 
     async def _status():
-        company = await Company.load()
+        company = await Company.load(company=_selected_company)
         s = company.status()
         agents = company.list_agents()
         org = company.get_org_chart()
@@ -411,7 +542,7 @@ def dashboard(
     from agent_company_ai.dashboard.server import run_dashboard
 
     console.print(f"[bold green]Starting dashboard at http://{host}:{port}[/bold green]")
-    run_dashboard(host=host, port=port)
+    run_dashboard(host=host, port=port, company=_selected_company)
 
 
 # ------------------------------------------------------------------
@@ -578,18 +709,18 @@ def setup(
     async def _setup():
         # Init company if not already
         from agent_company_ai.config import get_company_dir
-        company_dir = get_company_dir()
+        company_dir = get_company_dir(company=_selected_company)
         config_path = company_dir / "config.yaml"
 
         if config_path.exists():
-            company = await Company.load()
+            company = await Company.load(company=_selected_company)
             # Update name if different
             if company.config.name != company_name and company_name != "My AI Company":
                 company.config.name = company_name
                 from agent_company_ai.config import save_config
                 save_config(company.config, config_path)
         else:
-            company = await Company.init(name=company_name)
+            company = await Company.init(name=company_name, company=_selected_company)
 
         hired = []
         skipped = []
@@ -641,6 +772,110 @@ def setup(
 
     console.print(f"\n[dim]Next: agent-company-ai run \"Your goal here\"[/dim]")
     console.print(f"[dim]Edit: agent-company-ai hire/fire/team to adjust the team[/dim]")
+
+
+# ------------------------------------------------------------------
+# companies
+# ------------------------------------------------------------------
+
+
+@app.command()
+def companies():
+    """List all companies in this directory."""
+    from agent_company_ai.config import (
+        list_companies,
+        get_company_dir,
+        load_config,
+        maybe_migrate_legacy_layout,
+    )
+
+    maybe_migrate_legacy_layout()
+    slugs = list_companies()
+
+    if not slugs:
+        console.print("[yellow]No companies found.[/yellow] Use 'agent-company-ai init' to create one.")
+        return
+
+    table = Table(title="Companies")
+    table.add_column("Name", style="bold")
+    table.add_column("Slug", style="cyan")
+    table.add_column("Directory", style="dim")
+    table.add_column("Agents", justify="right")
+
+    for slug in slugs:
+        company_dir = get_company_dir(company=slug, create=False)
+        config_path = company_dir / "config.yaml"
+        try:
+            cfg = load_config(config_path)
+            agent_count = str(len(cfg.agents))
+            name = cfg.name
+        except Exception:
+            name = slug
+            agent_count = "?"
+        table.add_row(name, slug, str(company_dir), agent_count)
+
+    console.print(table)
+
+
+# ------------------------------------------------------------------
+# destroy
+# ------------------------------------------------------------------
+
+
+@app.command()
+def destroy(
+    company: str = typer.Option(
+        None,
+        "--company",
+        help="Company slug to destroy (overrides global -C, defaults to selected company)",
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+):
+    """Permanently delete a company and all its data."""
+    import shutil
+    from agent_company_ai.config import get_company_dir, load_config, maybe_migrate_legacy_layout
+
+    target = company or _selected_company
+    maybe_migrate_legacy_layout()
+    company_dir = get_company_dir(company=target, create=False)
+
+    if not company_dir.exists():
+        console.print(f"[red]No company found at {company_dir}[/red]")
+        raise typer.Exit(1)
+
+    # Show what will be deleted
+    config_path = company_dir / "config.yaml"
+    company_name = target
+    agent_count = 0
+    if config_path.exists():
+        try:
+            cfg = load_config(config_path)
+            company_name = cfg.name
+            agent_count = len(cfg.agents)
+        except Exception:
+            pass
+
+    console.print(f"\n[bold red]This will permanently delete:[/bold red]")
+    console.print(f"  Company: [bold]{company_name}[/bold] (slug: {target})")
+    console.print(f"  Agents:  {agent_count}")
+    console.print(f"  Path:    {company_dir}\n")
+
+    if not yes:
+        typer.confirm("Are you sure?", abort=True)
+
+    # Gracefully shut down the company if possible
+    async def _shutdown():
+        try:
+            from agent_company_ai.core.company import Company
+            co = await Company.load(company=target)
+            await co.shutdown()
+        except Exception:
+            pass  # DB might be corrupted — that's fine, we're deleting anyway
+
+    _run(_shutdown())
+
+    shutil.rmtree(company_dir)
+    console.print(f"[bold green]Company '{company_name}' destroyed.[/bold green]")
 
 
 if __name__ == "__main__":

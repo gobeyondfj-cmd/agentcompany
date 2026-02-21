@@ -20,6 +20,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 _app = FastAPI(title="Agent Company AI Dashboard")
 _company: Company | None = None
+_company_slug: str = "default"
 _websockets: list[WebSocket] = []
 
 
@@ -44,7 +45,7 @@ async def _event_handler(event: str, data: dict) -> None:
 @_app.on_event("startup")
 async def startup():
     global _company
-    _company = await Company.load()
+    _company = await Company.load(company=_company_slug)
     _company.set_event_handler(_event_handler)
     logger.info(f"Dashboard started for '{_company.config.name}'")
 
@@ -222,5 +223,7 @@ async def websocket_endpoint(ws: WebSocket):
 # ------------------------------------------------------------------
 
 
-def run_dashboard(host: str = "127.0.0.1", port: int = 8420) -> None:
+def run_dashboard(host: str = "127.0.0.1", port: int = 8420, company: str = "default") -> None:
+    global _company_slug
+    _company_slug = company
     uvicorn.run(_app, host=host, port=port, log_level="info")

@@ -1,4 +1,6 @@
 .agent-company-ai/
+.claude/
+.env
 __pycache__/
 *.pyc
 *.egg-info/

@@ -15,6 +15,7 @@ from agent_company_ai.config import (
     load_config,
     save_config,
     get_company_dir,
+    maybe_migrate_legacy_layout,
     AgentConfig,
 )
 from agent_company_ai.core.agent import Agent
@@ -63,9 +64,10 @@ class Company:
         self.bus.set_global_listener(self._on_bus_message)
 
     @classmethod
-    async def load(cls, base_path: Path | None = None) -> Company:
+    async def load(cls, base_path: Path | None = None, company: str = "default") -> Company:
         """Load an existing company from a .agent-company-ai directory."""
-        company_dir = get_company_dir(base_path)
+        maybe_migrate_legacy_layout(base_path)
+        company_dir = get_company_dir(company, base_path)
         config_path = company_dir / "config.yaml"
 
         if not config_path.exists():
@@ -89,9 +91,10 @@ class Company:
         return company
 
     @classmethod
-    async def init(cls, base_path: Path | None = None, name: str = "My AI Company") -> Company:
+    async def init(cls, base_path: Path | None = None, name: str = "My AI Company", company: str = "default") -> Company:
         """Initialize a new company in the given directory."""
-        company_dir = get_company_dir(base_path)
+        maybe_migrate_legacy_layout(base_path)
+        company_dir = get_company_dir(company, base_path)
         config_path = company_dir / "config.yaml"
 
         config = CompanyConfig(name=name)
