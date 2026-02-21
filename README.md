@@ -1,24 +1,24 @@
-# AgentCompany
+# Agent Company AI
 
 **Spin up an AI agent company - a business run by AI agents, managed by you.**
 
-AgentCompany lets a solo entrepreneur create a virtual company staffed entirely by AI agents. Each agent has a specific business role (CEO, CTO, Developer, Marketer, etc.), they collaborate on tasks, and you manage everything through a CLI or web dashboard.
+Agent Company AI lets a solo entrepreneur create a virtual company staffed entirely by AI agents. Each agent has a specific business role (CEO, CTO, Developer, Marketer, etc.), they collaborate on tasks, and you manage everything through a CLI or web dashboard.
 
 ## Quick Start
 
 ```bash
-pip install agentcompany
+pip install agent-company-ai
 ```
 
 ### 1. Initialize your company
 
 ```bash
-agentcompany init --name "My AI Startup"
+agent-company-ai init --name "My AI Startup"
 ```
 
 ### 2. Configure your LLM provider
 
-Edit `.agentcompany/config.yaml`:
+Edit `.agent-company-ai/config.yaml`:
 
 ```yaml
 company:
@@ -36,10 +36,10 @@ llm:
 ### 3. Hire your team
 
 ```bash
-agentcompany hire ceo --name Alice
-agentcompany hire cto --name Bob
-agentcompany hire developer --name Carol
-agentcompany hire marketer --name Dave
+agent-company-ai hire ceo --name Alice
+agent-company-ai hire cto --name Bob
+agent-company-ai hire developer --name Carol
+agent-company-ai hire marketer --name Dave
 ```
 
 ### 4. Run autonomously
@@ -47,7 +47,7 @@ agentcompany hire marketer --name Dave
 Give the CEO a goal and watch the company run:
 
 ```bash
-agentcompany run "Build a landing page for our new product"
+agent-company-ai run "Build a landing page for our new product"
 ```
 
 The CEO will break down the goal, delegate tasks to the team, and agents will collaborate to deliver results.
@@ -56,18 +56,18 @@ The CEO will break down the goal, delegate tasks to the team, and agents will co
 
 | Command | Description |
 |---------|-------------|
-| `agentcompany init` | Initialize a new company |
-| `agentcompany hire <role>` | Hire an agent |
-| `agentcompany fire <name>` | Remove an agent |
-| `agentcompany team` | List all agents |
-| `agentcompany assign "<task>"` | Assign a task |
-| `agentcompany tasks` | Show the task board |
-| `agentcompany chat <name>` | Chat with an agent |
-| `agentcompany run "<goal>"` | Autonomous mode |
-| `agentcompany broadcast "<msg>"` | Message all agents |
-| `agentcompany dashboard` | Launch web dashboard |
-| `agentcompany status` | Company overview |
-| `agentcompany roles` | List available roles |
+| `agent-company-ai init` | Initialize a new company |
+| `agent-company-ai hire <role>` | Hire an agent |
+| `agent-company-ai fire <name>` | Remove an agent |
+| `agent-company-ai team` | List all agents |
+| `agent-company-ai assign "<task>"` | Assign a task |
+| `agent-company-ai tasks` | Show the task board |
+| `agent-company-ai chat <name>` | Chat with an agent |
+| `agent-company-ai run "<goal>"` | Autonomous mode |
+| `agent-company-ai broadcast "<msg>"` | Message all agents |
+| `agent-company-ai dashboard` | Launch web dashboard |
+| `agent-company-ai status` | Company overview |
+| `agent-company-ai roles` | List available roles |
 
 ## Available Roles
 
@@ -88,7 +88,7 @@ The CEO will break down the goal, delegate tasks to the team, and agents will co
 Launch the dashboard:
 
 ```bash
-agentcompany dashboard --port 8420
+agent-company-ai dashboard --port 8420
 ```
 
 Features:
@@ -128,7 +128,7 @@ agents:
 Create custom roles by adding YAML files:
 
 ```yaml
-# .agentcompany/roles/custom_analyst.yaml
+# .agent-company-ai/roles/custom_analyst.yaml
 name: analyst
 title: "Data Analyst"
 description: "Analyzes data and creates reports"

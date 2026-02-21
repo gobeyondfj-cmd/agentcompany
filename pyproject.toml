@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-company-ai"
-version = "0.1.0"
+version = "0.1.1"
 description = "Spin up an AI agent company - a business run by AI agents, managed by you"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-authors = [{ name = "AgentCompany" }]
+authors = [{ name = "Agent Company AI" }]
 keywords = ["ai", "agents", "llm", "automation", "business"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -37,7 +37,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agentcompany = "agentcompany.cli.app:app"
+agent-company-ai = "agent_company_ai.cli.app:app"
 
 [project.urls]
 Homepage = "https://github.com/gobeyondfj-cmd/agentcompany"
@@ -45,5 +45,5 @@ Documentation = "https://github.com/gobeyondfj-cmd/agentcompany#readme"
 Issues = "https://github.com/gobeyondfj-cmd/agentcompany/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agentcompany"]
+packages = ["src/agent_company_ai"]
 
