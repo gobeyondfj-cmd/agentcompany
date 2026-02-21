@@ -21,6 +21,13 @@ console = Console()
 _selected_company: str = "default"
 
 
+def _version_callback(value: bool):
+    if value:
+        from importlib.metadata import version
+        console.print(f"agent-company-ai {version('agent-company-ai')}")
+        raise typer.Exit()
+
+
 @app.callback()
 def main(
     company: str = typer.Option(
@@ -29,6 +36,14 @@ def main(
         "-C",
         help="Company slug to operate on",
         envvar="AGENT_COMPANY_NAME",
+    ),
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        help="Show version and exit",
+        callback=_version_callback,
+        is_eager=True,
     ),
 ):
     """Spin up an AI agent company - a business run by AI agents, managed by you."""
@@ -505,10 +520,17 @@ def status():
 
     s, agents, org = _run(_status())
 
+    task_counts = s['tasks']
+    if task_counts:
+        task_parts = [f"{v} {k}" for k, v in task_counts.items()]
+        task_display = ", ".join(task_parts)
+    else:
+        task_display = "No tasks yet"
+
     console.print(Panel(
         f"[bold]{s['name']}[/bold]\n\n"
         f"Agents: {s['agents']}\n"
-        f"Tasks: {s['tasks']}\n"
+        f"Tasks: {task_display}\n"
         f"Running: {'Yes' if s['running'] else 'No'}\n"
         f"Output: {s.get('output_dir', 'N/A')}",
         title="Company Status",

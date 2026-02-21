@@ -335,6 +335,14 @@ class Company:
 
         return task
 
+    async def _persist_task(self, task: Task) -> None:
+        """Insert a task into the database so FOREIGN KEY constraints are met."""
+        await self.db.execute(
+            "INSERT OR IGNORE INTO tasks (id, description, assignee_id, status, priority, parent_id) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (task.id, task.description, task.assignee, task.status.value, task.priority, task.parent_id),
+        )
+
     async def _run_task(self, task: Task) -> str:
         """Run a task with its assigned agent."""
         agent = self.agents.get(task.assignee or "")
@@ -377,6 +385,7 @@ class Company:
                     if agent:
                         subtask.assign(agent.name)
                         self.task_board.add(subtask)
+                        await self._persist_task(subtask)
                         await self._run_task(subtask)
                         return
             except (json.JSONDecodeError, KeyError):
@@ -504,6 +513,7 @@ class Company:
                 assignee=ceo.name,
             )
             self.task_board.add(plan_task)
+            await self._persist_task(plan_task)
             await self._run_task(plan_task)
             cycle_results.append(plan_task.result or "")
 
@@ -549,6 +559,7 @@ class Company:
                 assignee=ceo.name,
             )
             self.task_board.add(review_task)
+            await self._persist_task(review_task)
             await self._run_task(review_task)
 
             # --- Step 4: Decide whether to continue ---
