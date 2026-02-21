@@ -16,24 +16,21 @@ pip install agent-company-ai
 agent-company-ai init --name "My AI Startup"
 ```
 
-### 2. Configure your LLM provider
+You'll be prompted to choose an LLM provider (Anthropic, OpenAI, DeepSeek, Ollama, and more).
 
-Edit `.agent-company-ai/config.yaml`:
+### 2. One-command setup
 
-```yaml
-company:
-  name: "My AI Startup"
-llm:
-  default_provider: anthropic
-  anthropic:
-    api_key: ${ANTHROPIC_API_KEY}
-    model: claude-sonnet-4-5-20250929
-  openai:
-    api_key: ${OPENAI_API_KEY}
-    model: gpt-4o
+Spin up a full team from a preset template:
+
+```bash
+agent-company-ai setup tech_startup --name "Acme AI"
+agent-company-ai setup saas --name "CloudCo" --provider anthropic
+agent-company-ai setup --list  # see all presets
 ```
 
-### 3. Hire your team
+**Available presets:** `tech_startup` (6 agents), `agency` (6), `ecommerce` (7), `saas` (9), `consulting` (6), `content` (5), `full` (10 — all departments)
+
+### 3. Or hire agents individually
 
 ```bash
 agent-company-ai hire ceo --name Alice
@@ -52,22 +49,77 @@ agent-company-ai run "Build a landing page for our new product"
 
 The CEO will break down the goal, delegate tasks to the team, and agents will collaborate to deliver results.
 
+```bash
+# With limits
+agent-company-ai run "Launch MVP" --cycles 3 --timeout 600 --max-tasks 20
+```
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `agent-company-ai init` | Initialize a new company |
-| `agent-company-ai hire <role>` | Hire an agent |
-| `agent-company-ai fire <name>` | Remove an agent |
-| `agent-company-ai team` | List all agents |
-| `agent-company-ai assign "<task>"` | Assign a task |
-| `agent-company-ai tasks` | Show the task board |
-| `agent-company-ai chat <name>` | Chat with an agent |
-| `agent-company-ai run "<goal>"` | Autonomous mode |
-| `agent-company-ai broadcast "<msg>"` | Message all agents |
-| `agent-company-ai dashboard` | Launch web dashboard |
-| `agent-company-ai status` | Company overview |
-| `agent-company-ai roles` | List available roles |
+| `init` | Initialize a new company |
+| `setup <preset>` | Set up a full company from a template |
+| `hire <role>` | Hire an agent |
+| `fire <name>` | Remove an agent |
+| `team` | List all agents |
+| `assign "<task>"` | Assign a task |
+| `tasks` | Show the task board |
+| `chat <name>` | Chat with an agent |
+| `run "<goal>"` | Autonomous mode |
+| `broadcast "<msg>"` | Message all agents |
+| `dashboard` | Launch web dashboard |
+| `status` | Company overview |
+| `roles` | List available roles |
+| `companies` | List all companies in this directory |
+| `destroy` | Permanently delete a company |
+
+### Global Options
+
+| Flag | Description |
+|------|-------------|
+| `--company` / `-C` | Company slug to operate on (default: `default`) |
+
+You can also set the company via environment variable:
+
+```bash
+export AGENT_COMPANY_NAME=my-startup
+agent-company-ai team  # operates on my-startup
+```
+
+## Multi-Company Support
+
+Run multiple independent companies in the same directory. Each company gets its own config, database, and agents:
+
+```bash
+# Default company
+agent-company-ai init --name "Acme AI"
+agent-company-ai hire ceo --name Alice
+
+# Create a second company
+agent-company-ai -C my-startup init --name "My Startup" --provider anthropic
+agent-company-ai -C my-startup hire ceo --name Bob
+
+# List all companies
+agent-company-ai companies
+
+# Destroy a company
+agent-company-ai destroy --company my-startup
+agent-company-ai destroy --yes  # destroy default, skip confirmation
+```
+
+**Directory layout:**
+```
+.agent-company-ai/
+    default/
+        config.yaml
+        company.db
+    my-startup/
+        config.yaml
+        company.db
+```
+
+Existing single-company setups are automatically migrated into `default/` on first access.
 
 ## Available Roles
 
@@ -83,25 +135,25 @@ The CEO will break down the goal, delegate tasks to the team, and agents will co
 | `hr` | Head of HR | CEO |
 | `project_manager` | Project Manager | CEO |
 
-## Web Dashboard
+## LLM Providers
 
-Launch the dashboard:
+Supports 11 providers out of the box:
 
-```bash
-agent-company-ai dashboard --port 8420
-```
+| Provider | Models | API Key Env Var |
+|----------|--------|-----------------|
+| **Anthropic** (default) | Claude Sonnet 4.5, etc. | `ANTHROPIC_API_KEY` |
+| **OpenAI** | GPT-4o, etc. | `OPENAI_API_KEY` |
+| **DeepSeek** | DeepSeek-R1 | `DEEPSEEK_API_KEY` |
+| **MiMo** | MiMo-7B-RL | `DEEPSEEK_API_KEY` |
+| **Kimi** | Kimi-K2 | `MOONSHOT_API_KEY` |
+| **Qwen** | Qwen-Max | `DASHSCOPE_API_KEY` |
+| **MiniMax** | MiniMax-M1 | `MINIMAX_API_KEY` |
+| **Ollama** | Llama 3.1, etc. | None (local) |
+| **Together** | Llama, Mixtral, etc. | `TOGETHER_API_KEY` |
+| **Groq** | Fast open-source inference | `GROQ_API_KEY` |
+| **OpenAI-compatible** | Any endpoint | Custom |
 
-Features:
-- **Org Chart** - Visual company hierarchy
-- **Agent Roster** - See all agents and their roles
-- **Task Board** - Kanban-style task management
-- **Chat** - Talk directly to any agent
-- **Activity Feed** - Real-time event stream
-- **Autonomous Mode** - Set goals from the UI
-
-## Multi-Provider LLM Support
-
-Configure different LLM providers per agent:
+Configure different providers per agent:
 
 ```yaml
 llm:
@@ -123,6 +175,50 @@ agents:
     provider: openai
 ```
 
+## Web Dashboard
+
+```bash
+agent-company-ai dashboard --port 8420
+```
+
+Features:
+- **Org Chart** - Visual company hierarchy
+- **Agent Roster** - See all agents and their roles
+- **Task Board** - Kanban-style task management
+- **Chat** - Talk directly to any agent
+- **Activity Feed** - Real-time event stream via WebSocket
+- **Autonomous Mode** - Set goals and monitor progress from the UI
+- **Cost Tracker** - Real-time API cost breakdown by agent and model
+
+## Built-in Agent Tools
+
+Agents have access to these tools based on their role:
+
+| Tool | Description |
+|------|-------------|
+| **web_search** | Search the web via DuckDuckGo (no API key needed) |
+| **read_file** / **write_file** | File operations in the workspace (sandboxed) |
+| **code_exec** | Execute Python code (restricted builtins) |
+| **shell** | Run shell commands (30s timeout, dangerous patterns blocked) |
+| **delegate_task** | Delegate work to other agents |
+| **report_result** | Submit task results |
+
+## Autonomous Mode
+
+The company runs in CEO-driven cycles:
+
+1. **Plan** - CEO breaks the goal into tasks and delegates to the team
+2. **Execute** - Agents work on tasks in parallel waves
+3. **Review** - CEO evaluates progress and decides: DONE, CONTINUE, or FAILED
+4. **Loop** - Repeat until goal achieved or limits reached
+
+**Configurable limits** (in `config.yaml` or via CLI flags):
+- `max_cycles: 5` — CEO review loops
+- `max_waves_per_cycle: 10` — parallel execution waves per cycle
+- `max_total_tasks: 50` — hard cap on tasks
+- `max_time_seconds: 3600` — wall-clock timeout
+- `max_cost_usd: 0.0` — spending cap (0 = unlimited)
+
 ## Custom Roles
 
 Create custom roles by adding YAML files:
@@ -143,17 +239,6 @@ default_tools:
 can_delegate_to: []
 reports_to: cto
 ```
-
-## Built-in Tools
-
-Agents have access to these tools based on their role:
-
-- **web_search** - Search the web for information
-- **read_file / write_file / list_files** - File operations in the workspace
-- **code_exec** - Execute Python code
-- **shell** - Run shell commands
-- **delegate_task** - Delegate work to other agents
-- **report_result** - Submit task results
 
 ## Enterprise Customization & Consulting
 
