@@ -88,13 +88,24 @@ class Agent:
         # Add report tool
         defs.append(ToolDefinition(
             name="report_result",
-            description="Report the final result of your current task back to the company.",
+            description=(
+                "Submit your FINAL, COMPLETE deliverable. Only call this AFTER "
+                "you have fully completed all work on the task. The 'result' field "
+                "must contain your entire deliverable — all analysis, recommendations, "
+                "data, and conclusions. Do NOT call this to say what you plan to do; "
+                "call it only when the work is done and ready to deliver."
+            ),
             parameters={
                 "type": "object",
                 "properties": {
                     "result": {
                         "type": "string",
-                        "description": "The result or deliverable of the task",
+                        "description": (
+                            "Your COMPLETE deliverable text. Must include all analysis, "
+                            "data, recommendations, and conclusions. Minimum several "
+                            "paragraphs. Never submit a plan or intention here — only "
+                            "the finished work product."
+                        ),
                     },
                     "status": {
                         "type": "string",
@@ -126,16 +137,26 @@ class Agent:
                 content=(
                     f"You have been assigned the following task:\n\n"
                     f"**Task:** {task.description}\n\n"
-                    f"Use your tools to complete this task. When finished, use the "
-                    f"report_result tool to submit your result. IMPORTANT: Include "
-                    f"your full deliverable text in the 'result' parameter of "
-                    f"report_result — do NOT leave it empty."
+                    f"Complete this task step by step:\n"
+                    f"1. Use your tools (web_search, etc.) to research and gather information.\n"
+                    f"2. Analyze the information and develop your deliverable.\n"
+                    f"3. ONLY when your work is fully complete, call report_result with "
+                    f"your ENTIRE deliverable in the 'result' field.\n\n"
+                    f"CRITICAL: Do NOT call report_result until you have completed all "
+                    f"work. The result must contain your full analysis, data, and "
+                    f"recommendations — not a plan of what you intend to do."
                 ),
             ),
         ]
 
-        # Track the last assistant text for fallback when report_result has empty result
-        last_assistant_text = ""
+        # Track the longest assistant text across all iterations for fallback.
+        # LLMs often write the full deliverable as assistant text in iteration N,
+        # then call report_result(result="") in iteration N+1 with a short preamble.
+        # By keeping the longest text, we capture the actual deliverable.
+        best_assistant_text = ""
+        # Allow up to 2 rejections of too-short report_results to force
+        # the agent to actually complete the work before submitting.
+        self._result_rejections = 0
 
         for iteration in range(max_iterations):
             try:
@@ -151,10 +172,11 @@ class Agent:
             # Track cost
             self._track_usage(response.usage)
 
-            # Capture assistant text
+            # Capture assistant text — keep the longest one as the best candidate
             if response.content:
                 logger.info(f"[{self.name}] thinks: {response.content[:200]}")
-                last_assistant_text = response.content
+                if len(response.content) > len(best_assistant_text):
+                    best_assistant_text = response.content
 
             # No tool calls - we're done
             if not response.tool_calls:
@@ -175,7 +197,7 @@ class Agent:
 
             for tc in response.tool_calls:
                 tool_result = await self._execute_tool(
-                    tc.name, tc.arguments, task, last_assistant_text,
+                    tc.name, tc.arguments, task, best_assistant_text,
                 )
 
                 # Check if task is now terminal (report_result was called)
@@ -188,7 +210,19 @@ class Agent:
                     tool_call_id=tc.id,
                 ))
 
-        # Ran out of iterations
+        # Ran out of iterations — try to salvage by using the best content
+        # from the conversation. Scan tool results for web_search data and
+        # assistant messages for any substantial content.
+        if best_assistant_text and len(best_assistant_text) >= 300:
+            logger.info(
+                f"[{self.name}] hit iteration limit but has substantial "
+                f"assistant text ({len(best_assistant_text)} chars), using as result."
+            )
+            task.complete(best_assistant_text)
+            await self._register_artifact(task, "result", "text", content=best_assistant_text)
+            self._export_deliverable(task, best_assistant_text)
+            return best_assistant_text
+
         task.fail("Exceeded maximum iterations without completing.")
         return "Failed: exceeded maximum iterations."
 
@@ -200,15 +234,48 @@ class Agent:
 
         if tool_name == "report_result":
             result = arguments.get("result", "")
-            # Fall back to assistant text if result is empty — LLMs often write
-            # the deliverable as message text and call report_result without it
-            if not result.strip() and assistant_text.strip():
-                result = assistant_text
             status = arguments.get("status", "done")
+
+            # Fall back to best assistant text if result is short
+            _MIN_DELIVERABLE_LEN = 300
+            if len(result.strip()) < _MIN_DELIVERABLE_LEN and len(assistant_text.strip()) > len(result.strip()):
+                logger.info(
+                    f"[{self.name}] report_result had short result ({len(result)} chars), "
+                    f"substituting with best assistant text ({len(assistant_text)} chars)"
+                )
+                result = assistant_text
+
+            # If result is STILL too short after substitution, reject up to 2
+            # times to force the agent to actually complete the work.
+            _MAX_REJECTIONS = 2
+            if (
+                status == "done"
+                and len(result.strip()) < _MIN_DELIVERABLE_LEN
+                and self._result_rejections < _MAX_REJECTIONS
+            ):
+                self._result_rejections += 1
+                logger.info(
+                    f"[{self.name}] rejecting short report_result ({len(result)} chars, "
+                    f"rejection {self._result_rejections}/{_MAX_REJECTIONS}). "
+                    f"Asking agent to complete the work."
+                )
+                return (
+                    f"REJECTED: Your submission is only {len(result.strip())} characters — "
+                    f"that is a plan/intention, not a completed deliverable.\n\n"
+                    f"STOP. Do NOT call report_result yet. Instead:\n"
+                    f"1. Think through the analysis in detail\n"
+                    f"2. If you have web_search available, use it to gather data\n"
+                    f"3. Write out the FULL deliverable with specific data, "
+                    f"numbers, analysis, and recommendations\n"
+                    f"4. ONLY THEN call report_result with the complete text\n\n"
+                    f"Your report_result must contain the entire finished work "
+                    f"product — at minimum several detailed paragraphs with "
+                    f"specific findings and actionable recommendations."
+                )
+
             if status == "done":
                 task.complete(result)
                 await self._register_artifact(task, "result", "text", content=result)
-                # Export deliverable to output directory as markdown
                 self._export_deliverable(task, result)
             else:
                 task.fail(result)

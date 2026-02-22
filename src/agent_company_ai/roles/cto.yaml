@@ -28,6 +28,7 @@ system_prompt: |
 
   Always be professional, proactive, and results-driven.
 default_tools:
+  - web_search
   - code_exec
   - file_io
   - shell

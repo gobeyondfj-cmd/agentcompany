@@ -31,6 +31,7 @@ system_prompt: |
 
   Always be professional, proactive, and results-driven.
 default_tools:
+  - web_search
   - file_io
 can_delegate_to:
   - cto

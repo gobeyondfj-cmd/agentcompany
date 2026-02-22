@@ -200,6 +200,9 @@ class Company:
         configured yet (e.g. no API key), the agent is still created so
         the org chart and team roster work. The provider will be resolved
         on the first actual LLM call.
+
+        Also ensures the agent exists in the database so FOREIGN KEY
+        constraints on tasks/artifacts are satisfied.
         """
         role = load_role(cfg.role)
         try:
@@ -227,6 +230,14 @@ class Company:
             profit_engine_dna=profit_engine_dna,
         )
         self.agents[cfg.name] = agent
+
+        # Ensure the agent exists in the DB (FK constraints on tasks/artifacts need this)
+        await self.db.execute(
+            "INSERT OR IGNORE INTO agents (id, name, role, provider, model, status) "
+            "VALUES (?, ?, ?, ?, ?, 'active')",
+            (cfg.name, cfg.name, cfg.role, cfg.provider or "", cfg.model or ""),
+        )
+
         return agent
 
     async def fire(self, agent_name: str) -> None:
@@ -577,6 +588,9 @@ class Company:
                     final_status = "failed"
 
         # --- Finalize ---
+        # Mark any tasks still pending/assigned/in-progress as cancelled
+        await self._cancel_incomplete_tasks()
+
         await self.db.execute(
             "UPDATE goals SET status = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?",
             (final_status, goal_id),
@@ -584,20 +598,64 @@ class Company:
 
         self._running = False
         summary = self._build_goal_summary()
+        scorecard = self._build_quality_scorecard()
         elapsed = time.monotonic() - start_time
         await self._emit("goal.completed", {
             "id": goal_id,
             "status": final_status,
             "summary": summary,
+            "scorecard": scorecard,
             "elapsed_seconds": int(elapsed),
             "cycles": min(cycle + 1, limits.max_cycles),
         })
         logger.info(f"Goal {final_status} after {int(elapsed)}s: {goal}")
+        logger.info(f"Deliverable quality: {scorecard}")
 
     def request_stop(self) -> None:
         """Request the autonomous loop to stop after the current wave."""
         self._stop_requested = True
         logger.info("Stop requested. Will halt after current wave completes.")
+
+    async def _cancel_incomplete_tasks(self) -> None:
+        """Mark any non-terminal tasks as cancelled when the goal loop ends."""
+        for t in self.task_board.list_all():
+            if not t.is_terminal:
+                t.fail("Cancelled: goal loop ended before task completed.")
+                await self.db.execute(
+                    "UPDATE tasks SET status = 'cancelled', result = 'Goal loop ended' "
+                    "WHERE id = ?",
+                    (t.id,),
+                )
+
+    def _build_quality_scorecard(self) -> dict:
+        """Build a quality scorecard for all deliverables."""
+        tasks = self.task_board.list_all()
+        total = 0
+        substantial = 0  # >1000 chars
+        partial = 0      # 200-1000 chars
+        thin = 0         # <200 chars
+        empty = 0        # no result
+
+        for t in tasks:
+            if t.status in (TaskStatus.DONE, TaskStatus.FAILED):
+                total += 1
+                result_len = len(t.result or "")
+                if result_len == 0:
+                    empty += 1
+                elif result_len < 200:
+                    thin += 1
+                elif result_len < 1000:
+                    partial += 1
+                else:
+                    substantial += 1
+
+        return {
+            "total_deliverables": total,
+            "substantial": substantial,
+            "partial": partial,
+            "thin": thin,
+            "empty": empty,
+        }
 
     def _build_goal_summary(self) -> str:
         """Build a summary of all task outcomes."""
@@ -611,7 +669,8 @@ class Company:
                 TaskStatus.PENDING: "[WAIT]",
             }.get(t.status, "[????]")
             assignee = t.assignee or "unassigned"
-            lines.append(f"  {status_icon} ({assignee}) {t.description[:80]}")
+            result_len = len(t.result or "")
+            lines.append(f"  {status_icon} ({assignee}) {t.description[:80]} [{result_len} chars]")
             if t.result:
                 lines.append(f"          Result: {t.result[:120]}")
         return "\n".join(lines)

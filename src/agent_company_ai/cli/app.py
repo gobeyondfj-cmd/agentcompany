@@ -491,13 +491,27 @@ def run(
             console.print("\n[yellow]Stop requested. Finishing current wave...[/yellow]")
 
         summary = company._build_goal_summary()
+        scorecard = company._build_quality_scorecard()
         await company.shutdown()
-        return summary
+        return summary, scorecard
 
     with console.status("[bold green]Company is running autonomously..."):
-        summary = _run(_run_goal())
+        summary, scorecard = _run(_run_goal())
 
     console.print(Panel(summary, title="Goal Summary"))
+
+    # Show deliverable quality scorecard
+    sc = scorecard
+    total = sc["total_deliverables"]
+    if total > 0:
+        quality_line = (
+            f"[bold]{total}[/bold] deliverables: "
+            f"[green]{sc['substantial']} substantial[/green], "
+            f"[yellow]{sc['partial']} partial[/yellow], "
+            f"[red]{sc['thin']} thin[/red], "
+            f"[dim]{sc['empty']} empty[/dim]"
+        )
+        console.print(Panel(quality_line, title="Deliverable Quality"))
 
 
 # ------------------------------------------------------------------
