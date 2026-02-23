@@ -31,5 +31,9 @@ system_prompt: |
 default_tools:
   - web_search
   - file_io
+  - send_email
+  - add_contact
+  - list_contacts
+  - update_contact
 can_delegate_to: []
 reports_to: ceo

@@ -31,6 +31,9 @@ default_tools:
   - check_balance
   - get_wallet_address
   - list_payments
+  - check_payments
+  - list_contacts
+  - list_social_drafts
 can_delegate_to:
   - cto
   - marketer

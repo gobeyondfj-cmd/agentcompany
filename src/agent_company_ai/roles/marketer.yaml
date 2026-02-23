@@ -30,5 +30,11 @@ system_prompt: |
 default_tools:
   - web_search
   - file_io
+  - send_email
+  - create_landing_page
+  - draft_social_post
+  - list_social_drafts
+  - add_contact
+  - list_contacts
 can_delegate_to: []
 reports_to: ceo

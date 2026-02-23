@@ -32,5 +32,12 @@ system_prompt: |
 default_tools:
   - web_search
   - file_io
+  - send_email
+  - create_payment_link
+  - create_crypto_payment_link
+  - check_payments
+  - add_contact
+  - list_contacts
+  - update_contact
 can_delegate_to: []
 reports_to: ceo

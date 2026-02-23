@@ -159,6 +159,50 @@ class ProfitEngineConfig(BaseModel):
         )
 
 
+class RateLimitConfig(BaseModel):
+    """Rate limits for external service integrations."""
+
+    emails_per_hour: int = 20
+    emails_per_day: int = 100
+    payment_links_per_day: int = 10
+    max_payment_amount_usd: float = 500.0
+
+
+class EmailConfig(BaseModel):
+    """Email sending configuration (Resend or SendGrid)."""
+
+    enabled: bool = False
+    provider: str = "resend"          # "resend" or "sendgrid"
+    api_key: str = ""                 # ${RESEND_API_KEY} or ${SENDGRID_API_KEY}
+    from_address: str = ""
+    from_name: str = ""
+    reply_to: str = ""
+
+
+class StripeConfig(BaseModel):
+    """Stripe payment integration configuration."""
+
+    enabled: bool = False
+    api_key: str = ""                 # ${STRIPE_SECRET_KEY}
+
+
+class LandingPageConfig(BaseModel):
+    """Landing page generator configuration."""
+
+    enabled: bool = False
+    serve_port: int = 8421
+    output_dir: str = "landing_pages"
+
+
+class IntegrationsConfig(BaseModel):
+    """External service integrations."""
+
+    email: EmailConfig = Field(default_factory=EmailConfig)
+    stripe: StripeConfig = Field(default_factory=StripeConfig)
+    landing_page: LandingPageConfig = Field(default_factory=LandingPageConfig)
+    rate_limits: RateLimitConfig = Field(default_factory=RateLimitConfig)
+
+
 class CompanyConfig(BaseModel):
     """Root configuration object representing the entire company."""
 
@@ -169,6 +213,7 @@ class CompanyConfig(BaseModel):
     autonomous: AutonomousConfig = Field(default_factory=AutonomousConfig)
     wallet: WalletConfig = Field(default_factory=WalletConfig)
     profit_engine: ProfitEngineConfig = Field(default_factory=ProfitEngineConfig)
+    integrations: IntegrationsConfig = Field(default_factory=IntegrationsConfig)
 
 
 # ---------------------------------------------------------------------------

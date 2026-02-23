@@ -180,6 +180,77 @@ class Database:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 executed_at TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS contacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                name TEXT DEFAULT '',
+                company TEXT DEFAULT '',
+                phone TEXT DEFAULT '',
+                status TEXT DEFAULT 'lead',
+                source TEXT DEFAULT '',
+                notes TEXT DEFAULT '',
+                tags TEXT DEFAULT '',
+                custom_fields TEXT DEFAULT '{}',
+                created_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS email_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                to_address TEXT NOT NULL,
+                from_address TEXT DEFAULT '',
+                subject TEXT DEFAULT '',
+                body_text TEXT DEFAULT '',
+                body_html TEXT DEFAULT '',
+                status TEXT DEFAULT 'sent',
+                provider_message_id TEXT DEFAULT '',
+                contact_id INTEGER,
+                sent_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (contact_id) REFERENCES contacts(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS payment_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                stripe_url TEXT DEFAULT '',
+                stripe_price_id TEXT DEFAULT '',
+                stripe_payment_link_id TEXT DEFAULT '',
+                product_name TEXT NOT NULL,
+                amount_cents INTEGER NOT NULL,
+                currency TEXT DEFAULT 'usd',
+                status TEXT DEFAULT 'active',
+                contact_id INTEGER,
+                created_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (contact_id) REFERENCES contacts(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS landing_pages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                slug TEXT UNIQUE NOT NULL,
+                html_content TEXT DEFAULT '',
+                file_path TEXT DEFAULT '',
+                status TEXT DEFAULT 'active',
+                created_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS social_drafts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform TEXT NOT NULL,
+                content TEXT NOT NULL,
+                media_urls TEXT DEFAULT '',
+                hashtags TEXT DEFAULT '',
+                status TEXT DEFAULT 'draft',
+                scheduled_for TIMESTAMP,
+                created_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
             """
         )
         await self._conn.commit()

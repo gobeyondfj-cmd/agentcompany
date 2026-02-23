@@ -35,5 +35,8 @@ default_tools:
   - get_wallet_address
   - request_payment
   - list_payments
+  - check_payments
+  - create_crypto_payment_link
+  - list_contacts
 can_delegate_to: []
 reports_to: ceo

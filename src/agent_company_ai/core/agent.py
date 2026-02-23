@@ -15,6 +15,11 @@ from agent_company_ai.llm.base import LLMMessage, BaseLLMProvider, ToolDefinitio
 from agent_company_ai.tools.registry import ToolRegistry
 from agent_company_ai.tools.file_io import copy_to_output
 from agent_company_ai.tools.wallet_tools import set_current_agent
+from agent_company_ai.tools.email_tool import set_email_agent
+from agent_company_ai.tools.stripe_tools import set_stripe_agent
+from agent_company_ai.tools.contacts import set_contacts_agent
+from agent_company_ai.tools.landing_page import set_landing_page_agent
+from agent_company_ai.tools.social_media import set_social_agent
 
 if TYPE_CHECKING:
     from agent_company_ai.storage.database import Database
@@ -126,8 +131,13 @@ class Agent:
         task.start()
         logger.info(f"[{self.name}] Starting task: {task.description}")
 
-        # Set current agent for tool attribution (e.g. wallet payment requests)
+        # Set current agent for tool attribution
         set_current_agent(self.name)
+        set_email_agent(self.name)
+        set_stripe_agent(self.name)
+        set_contacts_agent(self.name)
+        set_landing_page_agent(self.name)
+        set_social_agent(self.name)
 
         # Build messages
         messages = [

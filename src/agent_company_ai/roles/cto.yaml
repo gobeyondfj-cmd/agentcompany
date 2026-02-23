@@ -32,6 +32,7 @@ default_tools:
   - code_exec
   - file_io
   - shell
+  - create_landing_page
 can_delegate_to:
   - developer
 reports_to: ceo

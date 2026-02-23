@@ -26,7 +26,18 @@ from agent_company_ai.core.task import Task, TaskBoard, TaskStatus
 from agent_company_ai.llm.router import LLMRouter
 from agent_company_ai.storage.database import Database, get_database
 from agent_company_ai.tools.file_io import set_workspace, set_output_dir
-from agent_company_ai.tools.wallet_tools import set_wallet_manager
+from agent_company_ai.tools.wallet_tools import set_wallet_manager, set_wallet_db, set_wallet_company_dir
+from agent_company_ai.tools.email_tool import set_email_config, set_email_db, set_email_agent
+from agent_company_ai.tools.stripe_tools import (
+    set_stripe_config, set_stripe_db, set_stripe_agent, set_stripe_rate_limits,
+)
+from agent_company_ai.tools.contacts import set_contacts_db, set_contacts_agent
+from agent_company_ai.tools.landing_page import (
+    set_landing_page_db, set_landing_page_agent,
+    set_landing_page_config, set_landing_page_company_dir,
+)
+from agent_company_ai.tools.social_media import set_social_db, set_social_agent
+from agent_company_ai.tools.rate_limiter import RateLimiter
 from agent_company_ai.wallet.manager import WalletManager
 
 logger = logging.getLogger("agent_company_ai.company")
@@ -70,8 +81,48 @@ class Company:
         # Wallet manager
         self.wallet_dir = company_dir / "wallet"
         self.wallet_manager = WalletManager(self.wallet_dir, db)
+        set_wallet_db(db)
+        set_wallet_company_dir(company_dir)
         if config.wallet.enabled and self.wallet_manager.has_wallet():
             set_wallet_manager(self.wallet_manager)
+
+        # --- Integration tools ---
+        intg = config.integrations
+
+        # Contacts (always available — no API key needed)
+        set_contacts_db(db)
+
+        # Social media drafts (always available)
+        set_social_db(db)
+
+        # Landing pages
+        set_landing_page_company_dir(company_dir)
+        set_landing_page_db(db)
+        if intg.landing_page.enabled:
+            set_landing_page_config(intg.landing_page.output_dir)
+
+        # Email
+        if intg.email.enabled:
+            set_email_config(
+                provider=intg.email.provider,
+                api_key=intg.email.api_key,
+                from_address=intg.email.from_address,
+                from_name=intg.email.from_name,
+                reply_to=intg.email.reply_to,
+            )
+            set_email_db(db)
+
+        # Stripe
+        if intg.stripe.enabled:
+            set_stripe_config(api_key=intg.stripe.api_key)
+            set_stripe_db(db)
+            set_stripe_rate_limits(intg.rate_limits.max_payment_amount_usd)
+
+        # Rate limiter
+        limiter = RateLimiter.get()
+        limiter.configure("email_hourly", intg.rate_limits.emails_per_hour, 3600)
+        limiter.configure("email_daily", intg.rate_limits.emails_per_day, 86400)
+        limiter.configure("payment_links_daily", intg.rate_limits.payment_links_per_day, 86400)
 
         # Global message listener for persistence
         self.bus.set_global_listener(self._on_bus_message)
