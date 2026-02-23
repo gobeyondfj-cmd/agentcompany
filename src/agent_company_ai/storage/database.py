@@ -255,6 +255,19 @@ class Database:
         )
         await self._conn.commit()
 
+        # Incremental migrations — add columns that may not exist yet.
+        _alter_stmts = [
+            "ALTER TABLE social_drafts ADD COLUMN published_id TEXT DEFAULT ''",
+            "ALTER TABLE landing_pages ADD COLUMN live_url TEXT DEFAULT ''",
+        ]
+        for stmt in _alter_stmts:
+            try:
+                await self._conn.execute(stmt)
+                await self._conn.commit()
+            except Exception:
+                # Column already exists — safe to ignore.
+                pass
+
 
 # ------------------------------------------------------------------
 # Convenience factory

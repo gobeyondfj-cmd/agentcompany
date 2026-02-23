@@ -3,15 +3,21 @@
 No external API needed. Agents provide headline, body sections, CTA, etc.
 and the tool generates a polished HTML page from a built-in template.
 Saved to the company's landing_pages/ directory and logged in the database.
+
+``deploy_landing_page`` deploys a page to Vercel for a live public URL.
 """
 
 from __future__ import annotations
 
+import base64
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import httpx
+
 from agent_company_ai.tools.registry import tool
+from agent_company_ai.tools.rate_limiter import RateLimiter
 
 if TYPE_CHECKING:
     from agent_company_ai.storage.database import Database
@@ -21,6 +27,11 @@ _db: Database | None = None
 _current_agent: str = "unknown"
 _output_dir: Path | None = None
 _company_dir: Path | None = None
+
+# Vercel config state
+_vercel_token: str = ""
+_vercel_project_name: str = ""
+_vercel_enabled: bool = False
 
 
 def set_landing_page_db(db: Database) -> None:
@@ -46,10 +57,25 @@ def set_landing_page_company_dir(company_dir: Path) -> None:
     _company_dir = company_dir
 
 
+def set_vercel_config(token: str, project_name: str = "") -> None:
+    global _vercel_token, _vercel_project_name, _vercel_enabled
+    _vercel_token = token
+    _vercel_project_name = project_name
+    _vercel_enabled = True
+
+
 def _require_db() -> Database:
     if _db is None:
         raise RuntimeError("Landing page database not configured.")
     return _db
+
+
+def _require_vercel() -> None:
+    if not _vercel_enabled:
+        raise RuntimeError(
+            "Vercel not configured. Set vercel.enabled: true and provide "
+            "a token in your config.yaml integrations section."
+        )
 
 
 def _slugify(text: str) -> str:
@@ -319,4 +345,104 @@ async def create_landing_page(
         f"  File: {file_path}\n"
         f"  HTML size: {len(html_content)} bytes\n"
         f"  Status: active"
+    )
+
+
+@tool(
+    "deploy_landing_page",
+    (
+        "Deploy a landing page to Vercel for a live public URL. "
+        "The page must already exist in the database (created by create_landing_page)."
+    ),
+    {
+        "type": "object",
+        "properties": {
+            "slug": {
+                "type": "string",
+                "description": "The slug of the landing page to deploy (from create_landing_page)",
+            },
+        },
+        "required": ["slug"],
+    },
+)
+async def deploy_landing_page(slug: str) -> str:
+    db = _require_db()
+
+    # 1. Fetch page from DB
+    row = await db.fetch_one(
+        "SELECT * FROM landing_pages WHERE slug = ?", (slug,)
+    )
+    if not row:
+        return f"Error: no landing page with slug '{slug}'."
+
+    html_content = row.get("html_content", "")
+    if not html_content:
+        return f"Error: landing page '{slug}' has no HTML content."
+
+    # 2. Check Vercel config
+    try:
+        _require_vercel()
+    except RuntimeError as e:
+        return f"Error: {e}"
+
+    # 3. Rate limit
+    rl = RateLimiter.get()
+    if not rl.check("deploys_daily"):
+        return (
+            f"Error: Vercel daily deploy rate limit reached "
+            f"({rl.remaining('deploys_daily')} remaining). Try again later."
+        )
+
+    # 4. Build Vercel deployment payload
+    encoded_html = base64.b64encode(html_content.encode("utf-8")).decode()
+
+    deploy_name = _vercel_project_name or f"landing-{slug}"
+    payload: dict = {
+        "name": deploy_name,
+        "files": [
+            {
+                "file": "index.html",
+                "data": encoded_html,
+                "encoding": "base64",
+            }
+        ],
+        "target": "production",
+    }
+    if _vercel_project_name:
+        payload["project"] = _vercel_project_name
+
+    # 5. Deploy
+    url = "https://api.vercel.com/v13/deployments"
+    headers = {
+        "Authorization": f"Bearer {_vercel_token}",
+        "Content-Type": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(url, headers=headers, json=payload)
+        if resp.status_code not in (200, 201):
+            return f"Error: Vercel API returned {resp.status_code}: {resp.text}"
+        data = resp.json()
+    except Exception as e:
+        return f"Error deploying to Vercel: {e}"
+
+    # 6. Extract URL
+    deploy_url = data.get("url", "")
+    if deploy_url and not deploy_url.startswith("http"):
+        deploy_url = f"https://{deploy_url}"
+
+    # 7. Record rate limit + update DB
+    rl.record("deploys_daily")
+    await db.execute(
+        "UPDATE landing_pages SET live_url = ?, status = 'deployed', "
+        "updated_at = CURRENT_TIMESTAMP WHERE slug = ?",
+        (deploy_url, slug),
+    )
+
+    return (
+        f"Landing page deployed to Vercel!\n"
+        f"  Slug: {slug}\n"
+        f"  Live URL: {deploy_url}\n"
+        f"  Vercel deployment ID: {data.get('id', 'n/a')}\n"
+        f"  Remaining deploys today: {rl.remaining('deploys_daily')}"
     )

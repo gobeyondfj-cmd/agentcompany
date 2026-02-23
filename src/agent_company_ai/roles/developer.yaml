@@ -33,6 +33,7 @@ default_tools:
   - file_io
   - shell
   - create_landing_page
+  - deploy_landing_page
 can_delegate_to:
   - developer
 reports_to: cto

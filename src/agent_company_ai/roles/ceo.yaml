@@ -34,6 +34,7 @@ default_tools:
   - check_payments
   - list_contacts
   - list_social_drafts
+  - publish_social_post
 can_delegate_to:
   - cto
   - marketer

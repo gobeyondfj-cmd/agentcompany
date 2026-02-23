@@ -166,6 +166,8 @@ class RateLimitConfig(BaseModel):
     emails_per_day: int = 100
     payment_links_per_day: int = 10
     max_payment_amount_usd: float = 500.0
+    tweets_per_day: int = 17          # Free tier is very restrictive
+    deploys_per_day: int = 50
 
 
 class EmailConfig(BaseModel):
@@ -194,12 +196,32 @@ class LandingPageConfig(BaseModel):
     output_dir: str = "landing_pages"
 
 
+class TwitterConfig(BaseModel):
+    """Twitter/X API configuration for publishing social posts."""
+
+    enabled: bool = False
+    api_key: str = ""              # ${TWITTER_API_KEY}
+    api_secret: str = ""           # ${TWITTER_API_SECRET}
+    access_token: str = ""         # ${TWITTER_ACCESS_TOKEN}
+    access_token_secret: str = ""  # ${TWITTER_ACCESS_TOKEN_SECRET}
+
+
+class VercelConfig(BaseModel):
+    """Vercel deployment configuration for landing pages."""
+
+    enabled: bool = False
+    token: str = ""                # ${VERCEL_TOKEN}
+    project_name: str = ""         # optional: sets subdomain prefix
+
+
 class IntegrationsConfig(BaseModel):
     """External service integrations."""
 
     email: EmailConfig = Field(default_factory=EmailConfig)
     stripe: StripeConfig = Field(default_factory=StripeConfig)
     landing_page: LandingPageConfig = Field(default_factory=LandingPageConfig)
+    twitter: TwitterConfig = Field(default_factory=TwitterConfig)
+    vercel: VercelConfig = Field(default_factory=VercelConfig)
     rate_limits: RateLimitConfig = Field(default_factory=RateLimitConfig)
 
 

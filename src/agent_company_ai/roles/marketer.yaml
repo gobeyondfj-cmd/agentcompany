@@ -32,8 +32,10 @@ default_tools:
   - file_io
   - send_email
   - create_landing_page
+  - deploy_landing_page
   - draft_social_post
   - list_social_drafts
+  - publish_social_post
   - add_contact
   - list_contacts
 can_delegate_to: []

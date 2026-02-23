@@ -35,8 +35,9 @@ from agent_company_ai.tools.contacts import set_contacts_db, set_contacts_agent
 from agent_company_ai.tools.landing_page import (
     set_landing_page_db, set_landing_page_agent,
     set_landing_page_config, set_landing_page_company_dir,
+    set_vercel_config,
 )
-from agent_company_ai.tools.social_media import set_social_db, set_social_agent
+from agent_company_ai.tools.social_media import set_social_db, set_social_agent, set_twitter_config
 from agent_company_ai.tools.rate_limiter import RateLimiter
 from agent_company_ai.wallet.manager import WalletManager
 
@@ -118,11 +119,29 @@ class Company:
             set_stripe_db(db)
             set_stripe_rate_limits(intg.rate_limits.max_payment_amount_usd)
 
+        # Twitter
+        if intg.twitter.enabled:
+            set_twitter_config(
+                api_key=intg.twitter.api_key,
+                api_secret=intg.twitter.api_secret,
+                access_token=intg.twitter.access_token,
+                access_token_secret=intg.twitter.access_token_secret,
+            )
+
+        # Vercel
+        if intg.vercel.enabled:
+            set_vercel_config(
+                token=intg.vercel.token,
+                project_name=intg.vercel.project_name,
+            )
+
         # Rate limiter
         limiter = RateLimiter.get()
         limiter.configure("email_hourly", intg.rate_limits.emails_per_hour, 3600)
         limiter.configure("email_daily", intg.rate_limits.emails_per_day, 86400)
         limiter.configure("payment_links_daily", intg.rate_limits.payment_links_per_day, 86400)
+        limiter.configure("tweets_daily", intg.rate_limits.tweets_per_day, 86400)
+        limiter.configure("deploys_daily", intg.rate_limits.deploys_per_day, 86400)
 
         # Global message listener for persistence
         self.bus.set_global_listener(self._on_bus_message)
