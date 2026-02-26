@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable, Awaitable
+
+
+logger = logging.getLogger("agent_company_ai.message_bus")
 
 
 @dataclass
@@ -27,6 +31,7 @@ class MessageBus:
         self._subscribers: dict[str, list[Callback]] = {}  # topic -> callbacks
         self._agent_inboxes: dict[str, asyncio.Queue[BusMessage]] = {}
         self._history: list[BusMessage] = []
+        self._lock = asyncio.Lock()
         self._on_message: Callback | None = None  # global listener for logging
 
     def set_global_listener(self, callback: Callback) -> None:
@@ -46,11 +51,15 @@ class MessageBus:
         self._agent_inboxes.pop(agent_name, None)
 
     async def publish(self, message: BusMessage) -> None:
-        self._history.append(message)
+        async with self._lock:
+            self._history.append(message)
 
         # Notify global listener
         if self._on_message:
-            await self._on_message(message)
+            try:
+                await self._on_message(message)
+            except Exception as e:
+                logger.error(f"Global message listener error: {e}")
 
         # Deliver to specific agent inbox
         if message.to_agent and message.to_agent in self._agent_inboxes:
@@ -67,8 +76,8 @@ class MessageBus:
             for callback in self._subscribers[message.topic]:
                 try:
                     await callback(message)
-                except Exception:
-                    pass  # Don't let one subscriber crash others
+                except Exception as e:
+                    logger.error(f"Subscriber callback error on topic '{message.topic}': {e}")
 
     async def send(
         self,
@@ -86,7 +95,8 @@ class MessageBus:
         await self.publish(msg)
 
     def get_history(self, limit: int = 50, topic: str | None = None) -> list[BusMessage]:
-        messages = self._history
+        # Return a copy to avoid mutation during iteration
+        messages = list(self._history)
         if topic:
             messages = [m for m in messages if m.topic == topic]
         return messages[-limit:]

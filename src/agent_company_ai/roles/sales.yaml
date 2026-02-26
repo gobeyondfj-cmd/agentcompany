@@ -39,5 +39,21 @@ default_tools:
   - add_contact
   - list_contacts
   - update_contact
+  - create_gumroad_product
+  - list_gumroad_products
+  - check_gumroad_sales
+  - create_invoice
+  - send_invoice
+  - list_invoices
+  - mark_invoice_paid
+  - create_subscription_link
+  - list_subscribers
+  - check_subscription_revenue
+  - create_booking_link
+  - list_bookings
+  - check_booking_revenue
+  - check_revenue
+  - record_revenue
+  - sync_stripe_revenue
 can_delegate_to: []
 reports_to: ceo

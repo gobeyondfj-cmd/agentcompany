@@ -20,6 +20,11 @@ from agent_company_ai.tools.stripe_tools import set_stripe_agent
 from agent_company_ai.tools.contacts import set_contacts_agent
 from agent_company_ai.tools.landing_page import set_landing_page_agent
 from agent_company_ai.tools.social_media import set_social_agent
+from agent_company_ai.tools.gumroad_tools import set_gumroad_agent
+from agent_company_ai.tools.invoice_tool import set_invoice_agent
+from agent_company_ai.tools.stripe_subs import set_stripe_subs_agent
+from agent_company_ai.tools.booking_tool import set_booking_agent
+from agent_company_ai.tools.revenue_tools import set_revenue_agent
 
 if TYPE_CHECKING:
     from agent_company_ai.storage.database import Database
@@ -138,6 +143,11 @@ class Agent:
         set_contacts_agent(self.name)
         set_landing_page_agent(self.name)
         set_social_agent(self.name)
+        set_gumroad_agent(self.name)
+        set_invoice_agent(self.name)
+        set_stripe_subs_agent(self.name)
+        set_booking_agent(self.name)
+        set_revenue_agent(self.name)
 
         # Build messages
         messages = [
@@ -422,7 +432,7 @@ class Agent:
 
     def _track_usage(self, usage: dict | None) -> None:
         """Feed LLM usage data into the cost tracker."""
-        if not usage or not self._cost_tracker:
+        if not usage or not self._cost_tracker or not self.provider:
             return
         self._cost_tracker.record(
             agent=self.name,

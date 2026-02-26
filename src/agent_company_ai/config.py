@@ -168,6 +168,9 @@ class RateLimitConfig(BaseModel):
     max_payment_amount_usd: float = 500.0
     tweets_per_day: int = 17          # Free tier is very restrictive
     deploys_per_day: int = 50
+    gumroad_daily: int = 50
+    invoices_daily: int = 50
+    bookings_daily: int = 20
 
 
 class EmailConfig(BaseModel):
@@ -214,6 +217,31 @@ class VercelConfig(BaseModel):
     project_name: str = ""         # optional: sets subdomain prefix
 
 
+class GumroadConfig(BaseModel):
+    """Gumroad digital product sales configuration."""
+
+    enabled: bool = False
+    access_token: str = ""           # ${GUMROAD_ACCESS_TOKEN}
+
+
+class InvoiceConfig(BaseModel):
+    """Invoice generator configuration."""
+
+    enabled: bool = False
+    company_name: str = ""
+    company_address: str = ""
+    payment_instructions: str = ""
+    currency: str = "USD"
+
+
+class CalcomConfig(BaseModel):
+    """Cal.com paid booking configuration."""
+
+    enabled: bool = False
+    api_key: str = ""                # ${CALCOM_API_KEY}
+    default_duration: int = 30
+
+
 class IntegrationsConfig(BaseModel):
     """External service integrations."""
 
@@ -222,6 +250,9 @@ class IntegrationsConfig(BaseModel):
     landing_page: LandingPageConfig = Field(default_factory=LandingPageConfig)
     twitter: TwitterConfig = Field(default_factory=TwitterConfig)
     vercel: VercelConfig = Field(default_factory=VercelConfig)
+    gumroad: GumroadConfig = Field(default_factory=GumroadConfig)
+    invoice: InvoiceConfig = Field(default_factory=InvoiceConfig)
+    calcom: CalcomConfig = Field(default_factory=CalcomConfig)
     rate_limits: RateLimitConfig = Field(default_factory=RateLimitConfig)
 
 

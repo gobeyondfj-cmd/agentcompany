@@ -38,5 +38,8 @@ default_tools:
   - publish_social_post
   - add_contact
   - list_contacts
+  - create_gumroad_product
+  - list_gumroad_products
+  - check_gumroad_sales
 can_delegate_to: []
 reports_to: ceo

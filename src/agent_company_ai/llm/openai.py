@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import AsyncIterator
@@ -42,7 +43,10 @@ class OpenAIProvider(BaseLLMProvider):
                 "Install it with: pip install openai"
             ) from exc
 
-        client_kwargs: dict = {"api_key": self.api_key}
+        client_kwargs: dict = {
+            "api_key": self.api_key,
+            "timeout": 120.0,
+        }
         if self.base_url:
             client_kwargs["base_url"] = self.base_url
 
@@ -168,6 +172,25 @@ class OpenAIProvider(BaseLLMProvider):
     # Public interface
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _is_retryable(exc: Exception) -> bool:
+        """Check if an exception is retryable (transient server/rate-limit error)."""
+        import httpx
+
+        # httpx connection/timeout errors
+        if isinstance(exc, (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout)):
+            return True
+
+        # OpenAI API errors with status codes
+        status = getattr(exc, "status_code", None)
+        if status is not None:
+            if status in (429, 500, 502, 503):
+                return True
+            if status in (400, 401, 403, 404):
+                return False
+
+        return False
+
     async def complete(
         self,
         messages: list[LLMMessage],
@@ -184,13 +207,26 @@ class OpenAIProvider(BaseLLMProvider):
         if tools:
             kwargs["tools"] = self._convert_tools(tools)
 
-        try:
-            response = await self._client.chat.completions.create(**kwargs)
-        except Exception as exc:
-            logger.error("OpenAI API call failed: %s", exc)
-            raise
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            try:
+                response = await self._client.chat.completions.create(**kwargs)
+                return self._parse_response(response)
+            except Exception as exc:
+                if self._is_retryable(exc):
+                    delay = 2 ** (attempt * 2)  # 1, 4, 16
+                    logger.warning(
+                        "OpenAI API call failed (attempt %d/3), retrying in %ds: %s",
+                        attempt + 1, delay, exc,
+                    )
+                    last_exc = exc
+                    await asyncio.sleep(delay)
+                    continue
+                logger.error("OpenAI API call failed (non-retryable): %s", exc)
+                raise
 
-        return self._parse_response(response)
+        logger.error("OpenAI API call failed after 3 attempts: %s", last_exc)
+        raise last_exc  # type: ignore[misc]
 
     async def stream(
         self,

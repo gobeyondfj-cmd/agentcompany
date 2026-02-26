@@ -35,9 +35,16 @@ from agent_company_ai.tools.contacts import set_contacts_db, set_contacts_agent
 from agent_company_ai.tools.landing_page import (
     set_landing_page_db, set_landing_page_agent,
     set_landing_page_config, set_landing_page_company_dir,
-    set_vercel_config,
+    set_landing_page_company_name, set_vercel_config,
 )
 from agent_company_ai.tools.social_media import set_social_db, set_social_agent, set_twitter_config
+from agent_company_ai.tools.gumroad_tools import set_gumroad_config, set_gumroad_db, set_gumroad_agent
+from agent_company_ai.tools.invoice_tool import (
+    set_invoice_config, set_invoice_db, set_invoice_agent, set_invoice_company_dir,
+)
+from agent_company_ai.tools.stripe_subs import set_stripe_subs_config, set_stripe_subs_db, set_stripe_subs_agent
+from agent_company_ai.tools.booking_tool import set_booking_config, set_booking_db, set_booking_agent
+from agent_company_ai.tools.revenue_tools import set_revenue_db, set_revenue_agent, set_revenue_stripe_key
 from agent_company_ai.tools.rate_limiter import RateLimiter
 from agent_company_ai.wallet.manager import WalletManager
 
@@ -68,6 +75,7 @@ class Company:
         self.agents: dict[str, Agent] = {}
         self._running = False
         self._stop_requested = False
+        self._deadline: float = 0.0
         self._on_event: Callable[[str, dict], Awaitable[None]] | None = None
 
         # Set workspace for file tools
@@ -99,6 +107,7 @@ class Company:
         # Landing pages
         set_landing_page_company_dir(company_dir)
         set_landing_page_db(db)
+        set_landing_page_company_name(config.name)
         if intg.landing_page.enabled:
             set_landing_page_config(intg.landing_page.output_dir)
 
@@ -135,6 +144,40 @@ class Company:
                 project_name=intg.vercel.project_name,
             )
 
+        # Gumroad
+        if intg.gumroad.enabled:
+            set_gumroad_config(access_token=intg.gumroad.access_token)
+            set_gumroad_db(db)
+
+        # Invoice
+        set_invoice_company_dir(company_dir)
+        if intg.invoice.enabled:
+            set_invoice_config(
+                company_name=intg.invoice.company_name,
+                company_address=intg.invoice.company_address,
+                payment_instructions=intg.invoice.payment_instructions,
+                currency=intg.invoice.currency,
+            )
+            set_invoice_db(db)
+
+        # Stripe subscriptions (reuses stripe config)
+        if intg.stripe.enabled:
+            set_stripe_subs_config(api_key=intg.stripe.api_key)
+            set_stripe_subs_db(db)
+
+        # Cal.com bookings
+        if intg.calcom.enabled:
+            set_booking_config(
+                api_key=intg.calcom.api_key,
+                default_duration=intg.calcom.default_duration,
+            )
+            set_booking_db(db)
+
+        # Revenue tracking (always available)
+        set_revenue_db(db)
+        if intg.stripe.enabled:
+            set_revenue_stripe_key(intg.stripe.api_key)
+
         # Rate limiter
         limiter = RateLimiter.get()
         limiter.configure("email_hourly", intg.rate_limits.emails_per_hour, 3600)
@@ -142,6 +185,9 @@ class Company:
         limiter.configure("payment_links_daily", intg.rate_limits.payment_links_per_day, 86400)
         limiter.configure("tweets_daily", intg.rate_limits.tweets_per_day, 86400)
         limiter.configure("deploys_daily", intg.rate_limits.deploys_per_day, 86400)
+        limiter.configure("gumroad_daily", intg.rate_limits.gumroad_daily, 86400)
+        limiter.configure("invoices_daily", intg.rate_limits.invoices_daily, 86400)
+        limiter.configure("bookings_daily", intg.rate_limits.bookings_daily, 86400)
 
         # Global message listener for persistence
         self.bus.set_global_listener(self._on_bus_message)
@@ -150,7 +196,7 @@ class Company:
     async def load(cls, base_path: Path | None = None, company: str = "default") -> Company:
         """Load an existing company from a .agent-company-ai directory."""
         maybe_migrate_legacy_layout(base_path)
-        company_dir = get_company_dir(company, base_path)
+        company_dir = get_company_dir(company, base_path, create=False)
         config_path = company_dir / "config.yaml"
 
         if not config_path.exists():
@@ -412,7 +458,8 @@ class Company:
 
         # If assigned, start processing
         if assignee and assignee in self.agents:
-            asyncio.create_task(self._run_task(task))
+            bg = asyncio.create_task(self._run_task(task))
+            bg.add_done_callback(self._task_done_callback)
 
         return task
 
@@ -433,7 +480,24 @@ class Company:
 
         await self._emit("task.started", task.to_dict())
         max_iter = self.config.autonomous.max_agent_iterations
-        result = await agent.think(task, max_iterations=max_iter)
+
+        # Enforce remaining-time timeout so a hung LLM call can't block forever
+        remaining = None
+        if self._deadline > 0:
+            remaining = max(self._deadline - time.monotonic(), 1.0)
+
+        try:
+            if remaining is not None:
+                result = await asyncio.wait_for(
+                    agent.think(task, max_iterations=max_iter),
+                    timeout=remaining,
+                )
+            else:
+                result = await agent.think(task, max_iterations=max_iter)
+        except asyncio.TimeoutError:
+            logger.warning(f"[{agent.name}] Task timed out (deadline reached).")
+            task.fail("Task timed out: goal deadline reached.")
+            result = task.result or ""
 
         # Emit cost update
         await self._emit("cost.updated", self.cost_tracker.summary())
@@ -454,11 +518,20 @@ class Company:
 
         return result
 
+    @staticmethod
+    def _task_done_callback(t: asyncio.Task) -> None:
+        """Log exceptions from background tasks instead of silently dropping them."""
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc:
+            logger.error(f"Background task failed: {exc}")
+
     async def _handle_delegation(self, subtask: Task) -> None:
         """Find the right agent for a delegated subtask and run it."""
         # Try to find agent by matching role from the delegation
         # The subtask doesn't have an assignee yet - find from bus history
-        for msg in reversed(self.bus.get_history(limit=20, topic="task.delegate")):
+        for msg in reversed(self.bus.get_history(limit=200, topic="task.delegate")):
             try:
                 data = json.loads(msg.content)
                 if data.get("task_id") == subtask.id:
@@ -498,6 +571,11 @@ class Company:
         self._running = True
         self._stop_requested = False
         start_time = time.monotonic()
+        # Store deadline so _run_task can enforce per-task timeouts
+        if limits.max_time_seconds > 0:
+            self._deadline = start_time + limits.max_time_seconds
+        else:
+            self._deadline = 0.0  # 0 means no deadline
 
         # Persist goal
         goal_id = uuid.uuid4().hex[:12]
@@ -622,7 +700,10 @@ class Company:
                     if t.status != TaskStatus.IN_PROGRESS
                 ]
                 if tasks_to_run:
-                    await asyncio.gather(*tasks_to_run, return_exceptions=True)
+                    results = await asyncio.gather(*tasks_to_run, return_exceptions=True)
+                    for i, result in enumerate(results):
+                        if isinstance(result, Exception):
+                            logger.error(f"  Wave task failed: {result}")
 
             # --- Step 3: CEO review - ask if goal is met ---
             review_task = Task.create(
@@ -667,6 +748,7 @@ class Company:
         )
 
         self._running = False
+        self._deadline = 0.0
         summary = self._build_goal_summary()
         scorecard = self._build_quality_scorecard()
         elapsed = time.monotonic() - start_time
@@ -690,7 +772,7 @@ class Company:
         """Mark any non-terminal tasks as cancelled when the goal loop ends."""
         for t in self.task_board.list_all():
             if not t.is_terminal:
-                t.fail("Cancelled: goal loop ended before task completed.")
+                t.cancel("Goal loop ended before task completed.")
                 await self.db.execute(
                     "UPDATE tasks SET status = 'cancelled', result = 'Goal loop ended' "
                     "WHERE id = ?",
@@ -735,6 +817,7 @@ class Company:
             status_icon = {
                 TaskStatus.DONE: "[DONE]",
                 TaskStatus.FAILED: "[FAIL]",
+                TaskStatus.CANCELLED: "[CNCL]",
                 TaskStatus.IN_PROGRESS: "[....]",
                 TaskStatus.PENDING: "[WAIT]",
             }.get(t.status, "[????]")

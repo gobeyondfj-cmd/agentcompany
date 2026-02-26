@@ -28,13 +28,16 @@ async def _broadcast_ws(event: str, data: dict) -> None:
     """Send an event to all connected WebSocket clients."""
     payload = json.dumps({"event": event, "data": data})
     disconnected = []
-    for ws in _websockets:
+    for ws in list(_websockets):  # iterate a copy to avoid mutation during loop
         try:
             await ws.send_text(payload)
         except Exception:
             disconnected.append(ws)
     for ws in disconnected:
-        _websockets.remove(ws)
+        try:
+            _websockets.remove(ws)
+        except ValueError:
+            pass  # already removed
 
 
 async def _event_handler(event: str, data: dict) -> None:
@@ -128,12 +131,26 @@ async def api_chat(agent_name: str, body: dict):
         return {"error": str(e)}
 
 
+_goal_task: asyncio.Task | None = None
+
+
 @_app.post("/api/goal")
 async def api_run_goal(body: dict):
+    global _goal_task
     if not _company:
         return {"error": "Company not loaded"}
     goal = body.get("goal", "")
-    asyncio.create_task(_company.run_goal(goal))
+    _goal_task = asyncio.create_task(_company.run_goal(goal))
+
+    def _on_goal_done(t: asyncio.Task) -> None:
+        if t.cancelled():
+            logger.warning(f"Goal cancelled: {goal[:60]}")
+        elif t.exception():
+            logger.error(f"Goal failed with error: {t.exception()}")
+        else:
+            logger.info(f"Goal completed: {goal[:60]}")
+
+    _goal_task.add_done_callback(_on_goal_done)
     return {"status": "started", "goal": goal}
 
 
@@ -318,7 +335,10 @@ async def websocket_endpoint(ws: WebSocket):
             except (json.JSONDecodeError, KeyError):
                 pass
     except WebSocketDisconnect:
-        _websockets.remove(ws)
+        try:
+            _websockets.remove(ws)
+        except ValueError:
+            pass
 
 
 # ------------------------------------------------------------------

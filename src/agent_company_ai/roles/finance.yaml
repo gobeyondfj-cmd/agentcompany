@@ -38,5 +38,16 @@ default_tools:
   - check_payments
   - create_crypto_payment_link
   - list_contacts
+  - check_gumroad_sales
+  - create_invoice
+  - send_invoice
+  - list_invoices
+  - mark_invoice_paid
+  - list_subscribers
+  - check_subscription_revenue
+  - check_booking_revenue
+  - check_revenue
+  - record_revenue
+  - sync_stripe_revenue
 can_delegate_to: []
 reports_to: ceo

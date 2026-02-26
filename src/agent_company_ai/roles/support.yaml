@@ -35,5 +35,7 @@ default_tools:
   - add_contact
   - list_contacts
   - update_contact
+  - list_bookings
+  - create_booking_link
 can_delegate_to: []
 reports_to: ceo

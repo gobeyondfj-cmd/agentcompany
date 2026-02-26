@@ -64,14 +64,16 @@ class Database:
         Returns the raw ``aiosqlite.Cursor`` so callers can inspect
         ``lastrowid``, ``rowcount``, etc.
         """
-        assert self._conn is not None, "Database not connected. Call connect() first."
+        if self._conn is None:
+            raise RuntimeError("Database not connected. Call connect() first.")
         cursor = await self._conn.execute(sql, params)
         await self._conn.commit()
         return cursor
 
     async def fetch_one(self, sql: str, params: tuple = ()) -> Optional[dict]:
         """Execute a query and return the first row as a dict, or ``None``."""
-        assert self._conn is not None, "Database not connected. Call connect() first."
+        if self._conn is None:
+            raise RuntimeError("Database not connected. Call connect() first.")
         cursor = await self._conn.execute(sql, params)
         row = await cursor.fetchone()
         if row is None:
@@ -80,7 +82,8 @@ class Database:
 
     async def fetch_all(self, sql: str, params: tuple = ()) -> list[dict]:
         """Execute a query and return all rows as a list of dicts."""
-        assert self._conn is not None, "Database not connected. Call connect() first."
+        if self._conn is None:
+            raise RuntimeError("Database not connected. Call connect() first.")
         cursor = await self._conn.execute(sql, params)
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
@@ -91,7 +94,8 @@ class Database:
 
     async def _migrate(self) -> None:
         """Create all required tables if they do not already exist."""
-        assert self._conn is not None
+        if self._conn is None:
+            raise RuntimeError("Database not connected. Cannot run migrations.")
 
         await self._conn.executescript(
             """\
@@ -250,6 +254,80 @@ class Database:
                 created_by TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS gumroad_products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                gumroad_id TEXT DEFAULT '',
+                name TEXT NOT NULL,
+                price_cents INTEGER NOT NULL,
+                description TEXT DEFAULT '',
+                url TEXT DEFAULT '',
+                status TEXT DEFAULT 'active',
+                created_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS invoices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_number TEXT UNIQUE NOT NULL,
+                client_name TEXT NOT NULL,
+                client_email TEXT DEFAULT '',
+                items_json TEXT DEFAULT '[]',
+                subtotal_cents INTEGER DEFAULT 0,
+                tax_cents INTEGER DEFAULT 0,
+                total_cents INTEGER DEFAULT 0,
+                currency TEXT DEFAULT 'USD',
+                status TEXT DEFAULT 'draft',
+                due_date TEXT DEFAULT '',
+                notes TEXT DEFAULT '',
+                payment_instructions TEXT DEFAULT '',
+                html_content TEXT DEFAULT '',
+                file_path TEXT DEFAULT '',
+                sent_at TIMESTAMP,
+                paid_at TIMESTAMP,
+                created_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS subscription_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                stripe_url TEXT DEFAULT '',
+                stripe_price_id TEXT DEFAULT '',
+                stripe_payment_link_id TEXT DEFAULT '',
+                product_name TEXT NOT NULL,
+                monthly_amount_cents INTEGER NOT NULL,
+                currency TEXT DEFAULT 'usd',
+                trial_days INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'active',
+                created_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS booking_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                calcom_event_id TEXT DEFAULT '',
+                title TEXT NOT NULL,
+                duration_minutes INTEGER DEFAULT 30,
+                price_cents INTEGER DEFAULT 0,
+                currency TEXT DEFAULT 'usd',
+                booking_url TEXT DEFAULT '',
+                status TEXT DEFAULT 'active',
+                created_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS revenue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL,
+                source_id TEXT DEFAULT '',
+                payment_link_id INTEGER,
+                amount_cents INTEGER NOT NULL,
+                currency TEXT DEFAULT 'usd',
+                description TEXT DEFAULT '',
+                status TEXT DEFAULT 'confirmed',
+                recorded_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """
         )

@@ -89,10 +89,13 @@ async def _send_via_resend(to: str, subject: str, body: str, is_html: bool) -> d
             json=payload,
             timeout=30.0,
         )
-    data = resp.json()
     if resp.status_code >= 400:
+        try:
+            data = resp.json()
+        except Exception:
+            data = resp.text
         raise RuntimeError(f"Resend API error ({resp.status_code}): {data}")
-    return data
+    return resp.json()
 
 
 async def _send_via_sendgrid(to: str, subject: str, body: str, is_html: bool) -> dict:

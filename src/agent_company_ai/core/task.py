@@ -15,6 +15,7 @@ class TaskStatus(str, Enum):
     REVIEW = "review"
     DONE = "done"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 @dataclass
@@ -76,9 +77,14 @@ class Task:
         self.subtasks.append(subtask)
         return subtask
 
+    def cancel(self, reason: str | None = None) -> None:
+        self.status = TaskStatus.CANCELLED
+        self.result = reason
+        self.updated_at = datetime.now(timezone.utc)
+
     @property
     def is_terminal(self) -> bool:
-        return self.status in (TaskStatus.DONE, TaskStatus.FAILED)
+        return self.status in (TaskStatus.DONE, TaskStatus.FAILED, TaskStatus.CANCELLED)
 
     @property
     def all_subtasks_done(self) -> bool:

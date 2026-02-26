@@ -28,6 +28,9 @@ _current_agent: str = "unknown"
 _output_dir: Path | None = None
 _company_dir: Path | None = None
 
+# Company name for footer
+_company_name: str = "My AI Company"
+
 # Vercel config state
 _vercel_token: str = ""
 _vercel_project_name: str = ""
@@ -55,6 +58,11 @@ def set_landing_page_config(output_dir_name: str) -> None:
 def set_landing_page_company_dir(company_dir: Path) -> None:
     global _company_dir
     _company_dir = company_dir
+
+
+def set_landing_page_company_name(name: str) -> None:
+    global _company_name
+    _company_name = name
 
 
 def set_vercel_config(token: str, project_name: str = "") -> None:
@@ -290,8 +298,7 @@ async def create_landing_page(
 
     cta_sub_html = f'<div class="sub">{_escape(cta_subtext)}</div>' if cta_subtext else ""
 
-    # Build from hardcoded company name or fallback
-    company_name = "Apex Strategy Group"
+    company_name = _company_name
 
     html_content = _PAGE_TEMPLATE.format(
         title=_escape(title),

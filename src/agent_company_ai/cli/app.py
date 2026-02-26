@@ -64,6 +64,22 @@ def _run(coro):
         return asyncio.run(coro)
 
 
+# Provider presets: maps user-facing name to (config provider, base_url, default_model, env_var)
+PROVIDER_PRESETS = {
+    "anthropic":     ("anthropic", None,                                     "claude-sonnet-4-5-20250929",              "ANTHROPIC_API_KEY"),
+    "openai":        ("openai",   None,                                     "gpt-4o",                                  "OPENAI_API_KEY"),
+    "deepseek":      ("openai",   "https://api.deepseek.com/v1",           "deepseek-r1",                             "DEEPSEEK_API_KEY"),
+    "mimo":          ("openai",   "https://api.deepseek.com/v1",           "mimo-7b-rl",                              "DEEPSEEK_API_KEY"),
+    "kimi":          ("openai",   "https://api.moonshot.cn/v1",            "kimi-k2-0711-preview",                    "MOONSHOT_API_KEY"),
+    "qwen":          ("openai",   "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-max",                    "DASHSCOPE_API_KEY"),
+    "minimax":       ("openai",   "https://api.minimaxi.chat/v1",        "MiniMax-M1",                              "MINIMAX_API_KEY"),
+    "ollama":        ("openai",   "http://localhost:11434/v1",             "llama3.1",                                None),
+    "together":      ("openai",   "https://api.together.xyz/v1",           "meta-llama/Llama-3.3-70B-Instruct-Turbo", "TOGETHER_API_KEY"),
+    "groq":          ("openai",   "https://api.groq.com/openai/v1",       "llama-3.3-70b-versatile",                 "GROQ_API_KEY"),
+    "openai-compat": ("openai",   None,                                    None,                                      None),
+}
+
+
 # ------------------------------------------------------------------
 # init
 # ------------------------------------------------------------------
@@ -81,26 +97,14 @@ def init(
     from agent_company_ai.core.company import Company
     from agent_company_ai.config import save_config, LLMProviderConfig
 
-    # Provider presets: maps user-facing name to (config provider, base_url, default_model, env_var)
-    PROVIDER_PRESETS = {
-        "anthropic":     ("anthropic", None,                                     "claude-sonnet-4-5-20250929",              "ANTHROPIC_API_KEY"),
-        "openai":        ("openai",   None,                                     "gpt-4o",                                  "OPENAI_API_KEY"),
-        "deepseek":      ("openai",   "https://api.deepseek.com/v1",           "deepseek-r1",                             "DEEPSEEK_API_KEY"),
-        "mimo":          ("openai",   "https://api.deepseek.com/v1",           "mimo-7b-rl",                              "DEEPSEEK_API_KEY"),
-        "kimi":          ("openai",   "https://api.moonshot.cn/v1",            "kimi-k2-0711-preview",                    "MOONSHOT_API_KEY"),
-        "qwen":          ("openai",   "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-max",                    "DASHSCOPE_API_KEY"),
-        "minimax":       ("openai",   "https://api.minimaxi.chat/v1",        "MiniMax-M1",                              "MINIMAX_API_KEY"),
-        "ollama":        ("openai",   "http://localhost:11434/v1",             "llama3.1",                                None),
-        "together":      ("openai",   "https://api.together.xyz/v1",           "meta-llama/Llama-3.3-70B-Instruct-Turbo", "TOGETHER_API_KEY"),
-        "groq":          ("openai",   "https://api.groq.com/openai/v1",       "llama-3.3-70b-versatile",                 "GROQ_API_KEY"),
-        "openai-compat": ("openai",   None,                                    None,                                      None),
-    }
-
     # Interactive provider selection when --provider not given
     chosen_provider = provider
     chosen_key = api_key
     chosen_model = model
     chosen_base_url = base_url
+
+    # Fully non-interactive when all flags provided
+    _fully_specified = chosen_provider is not None and chosen_key is not None
 
     if chosen_provider is None:
         console.print("\n[bold]Configure LLM provider[/bold]")
@@ -136,10 +140,10 @@ def init(
         if not chosen_base_url:
             if preset_base_url:
                 chosen_base_url = preset_base_url
-            elif chosen_provider == "openai-compat":
+            elif chosen_provider == "openai-compat" and not _fully_specified:
                 chosen_base_url = console.input("Base URL (e.g. http://localhost:8000/v1): ").strip()
 
-        # API key: use flag > prompt > env var placeholder
+        # API key: use flag > skip prompt if fully specified > prompt > env var placeholder
         if not chosen_key:
             if chosen_provider == "ollama":
                 chosen_key = "ollama"  # Ollama doesn't need a real key
@@ -150,14 +154,16 @@ def init(
             else:
                 chosen_key = console.input("API key (or press Enter to skip): ").strip() or ""
 
-        # Model: use flag > prompt with preset default
+        # Model: use flag > preset default (non-interactive) > prompt
         if not chosen_model:
-            if preset_model:
+            if _fully_specified and preset_model:
+                chosen_model = preset_model
+            elif preset_model:
                 entered = console.input(
                     f"Model [{preset_model}]: "
                 ).strip()
                 chosen_model = entered or preset_model
-            else:
+            elif not _fully_specified:
                 chosen_model = console.input("Model name: ").strip()
 
     async def _init():
@@ -359,8 +365,9 @@ def tasks():
     table.add_column("Subtasks", justify="right")
 
     status_colors = {
-        "done": "green", "failed": "red", "in_progress": "yellow",
-        "pending": "dim", "assigned": "blue", "review": "magenta",
+        "done": "green", "failed": "red", "cancelled": "dim red",
+        "in_progress": "yellow", "pending": "dim", "assigned": "blue",
+        "review": "magenta",
     }
 
     for t in all_tasks:
@@ -624,6 +631,87 @@ def output(
 
 
 # ------------------------------------------------------------------
+# revenue
+# ------------------------------------------------------------------
+
+
+@app.command()
+def revenue(
+    days: int = typer.Option(30, "--days", "-d", help="Number of days to look back"),
+):
+    """Show company revenue summary."""
+    from agent_company_ai.storage.database import get_database
+    from agent_company_ai.config import get_company_dir, maybe_migrate_legacy_layout
+
+    maybe_migrate_legacy_layout()
+    company_dir = get_company_dir(company=_selected_company, create=False)
+    if not (company_dir / "config.yaml").exists():
+        console.print("[red]No company found.[/red] Run 'agent-company-ai init' first.")
+        raise typer.Exit(1)
+
+    async def _revenue():
+        db = get_database(company_dir)
+        await db.connect()
+
+        # All-time total
+        row = await db.fetch_one(
+            "SELECT COALESCE(SUM(amount_cents), 0) AS total FROM revenue "
+            "WHERE status = 'confirmed'"
+        )
+        all_time = row["total"] if row else 0
+
+        # Period total
+        row = await db.fetch_one(
+            "SELECT COALESCE(SUM(amount_cents), 0) AS total FROM revenue "
+            "WHERE status = 'confirmed' AND created_at >= datetime('now', ?)",
+            (f"-{days} days",),
+        )
+        period = row["total"] if row else 0
+
+        # Last 7 days
+        row = await db.fetch_one(
+            "SELECT COALESCE(SUM(amount_cents), 0) AS total FROM revenue "
+            "WHERE status = 'confirmed' AND created_at >= datetime('now', '-7 days')"
+        )
+        week = row["total"] if row else 0
+
+        # By source
+        sources = await db.fetch_all(
+            "SELECT source, COALESCE(SUM(amount_cents), 0) AS total, COUNT(*) AS cnt "
+            "FROM revenue WHERE status = 'confirmed' "
+            "AND created_at >= datetime('now', ?) "
+            "GROUP BY source ORDER BY total DESC",
+            (f"-{days} days",),
+        )
+
+        await db.close()
+        return all_time, period, week, sources
+
+    all_time, period, week, sources = _run(_revenue())
+
+    # Summary panel
+    console.print(Panel(
+        f"[bold]All-time:[/bold]     ${all_time / 100:.2f}\n"
+        f"[bold]Last {days} days:[/bold] ${period / 100:.2f}\n"
+        f"[bold]Last 7 days:[/bold]  ${week / 100:.2f}",
+        title="Revenue Summary",
+        border_style="green",
+    ))
+
+    # By source table
+    if sources:
+        table = Table(title=f"Revenue by Source (last {days} days)")
+        table.add_column("Source", style="cyan")
+        table.add_column("Amount", justify="right", style="bold")
+        table.add_column("Transactions", justify="right")
+        for s in sources:
+            table.add_row(s["source"], f"${s['total'] / 100:.2f}", str(s["cnt"]))
+        console.print(table)
+    else:
+        console.print("[dim]No revenue recorded yet.[/dim]")
+
+
+# ------------------------------------------------------------------
 # dashboard
 # ------------------------------------------------------------------
 
@@ -758,6 +846,7 @@ def setup(
     ),
     company_name: str = typer.Option("My AI Company", "--name", "-n", help="Company name"),
     provider: str = typer.Option(None, "--provider", "-p", help="LLM provider for all agents"),
+    api_key: str = typer.Option(None, "--api-key", "-k", help="API key (enables non-interactive init)"),
     model: str = typer.Option(None, "--model", "-m", help="Model for all agents"),
     list_presets: bool = typer.Option(False, "--list", "-l", help="List available presets"),
 ):
@@ -768,7 +857,7 @@ def setup(
 
     Examples:
       agent-company-ai setup tech_startup --name "Acme AI"
-      agent-company-ai setup saas --name "CloudCo" --provider anthropic
+      agent-company-ai setup saas --name "CloudCo" --provider anthropic --api-key sk-ant-...
       agent-company-ai setup --list
     """
     if list_presets or company_type is None:
@@ -803,7 +892,7 @@ def setup(
 
     async def _setup():
         # Init company if not already
-        from agent_company_ai.config import get_company_dir
+        from agent_company_ai.config import get_company_dir, save_config, LLMProviderConfig
         company_dir = get_company_dir(company=_selected_company)
         config_path = company_dir / "config.yaml"
 
@@ -812,10 +901,27 @@ def setup(
             # Update name if different
             if company.config.name != company_name and company_name != "My AI Company":
                 company.config.name = company_name
-                from agent_company_ai.config import save_config
                 save_config(company.config, config_path)
         else:
             company = await Company.init(name=company_name, company=_selected_company)
+            # Apply LLM config if api_key provided (non-interactive init)
+            if api_key and provider:
+                full_preset = PROVIDER_PRESETS.get(provider, ("openai", None, None, None))
+                cfg_provider, cfg_base_url, cfg_default_model = full_preset[0], full_preset[1], full_preset[2]
+                provider_config = LLMProviderConfig(
+                    api_key=api_key,
+                    model=model or cfg_default_model or "",
+                    base_url=cfg_base_url,
+                )
+                company.config.llm.default_provider = cfg_provider
+                if cfg_provider == "anthropic":
+                    company.config.llm.anthropic = provider_config
+                else:
+                    company.config.llm.openai = provider_config
+                save_config(company.config, config_path)
+                # Rebuild router with new config
+                from agent_company_ai.llm.router import LLMRouter
+                company.router = LLMRouter(company.config.llm)
 
         hired = []
         skipped = []

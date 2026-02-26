@@ -35,6 +35,13 @@ default_tools:
   - list_contacts
   - list_social_drafts
   - publish_social_post
+  - list_gumroad_products
+  - check_gumroad_sales
+  - list_invoices
+  - list_subscribers
+  - check_subscription_revenue
+  - list_bookings
+  - check_revenue
 can_delegate_to:
   - cto
   - marketer
