@@ -81,6 +81,103 @@ PROVIDER_PRESETS = {
 
 
 # ------------------------------------------------------------------
+# Integration setup helpers
+# ------------------------------------------------------------------
+
+
+def _prompt_integrations(company_name: str) -> dict:
+    """Interactively prompt for integration configuration.
+
+    Returns a dict of integration overrides to merge into
+    ``company.config.integrations``.
+    """
+    from agent_company_ai.config import (
+        StripeConfig, EmailConfig, GumroadConfig,
+        CalcomConfig, InvoiceConfig, LandingPageConfig,
+    )
+
+    console.print("\n[bold]Configure integrations (optional)[/bold]")
+    console.print("  [cyan][1][/cyan] Stripe (payment links & subscriptions)")
+    console.print("  [cyan][2][/cyan] Email (send invoices & notifications)")
+    console.print("  [cyan][3][/cyan] Gumroad (sell digital products)")
+    console.print("  [cyan][4][/cyan] Cal.com (paid bookings)")
+    console.print("  [cyan][5][/cyan] Invoices (generate & send invoices)")
+    console.print("  [cyan][6][/cyan] Landing Pages (auto-enabled, no key needed)")
+    console.print("  [cyan][7][/cyan] All of the above")
+    console.print("  [cyan][8][/cyan] Skip for now")
+
+    raw = console.input("\nChoose integrations [comma-separated, e.g. 1,2,5]: ").strip()
+    if not raw or raw == "8":
+        return {}
+
+    choices = {c.strip() for c in raw.split(",")}
+    if "7" in choices:
+        choices = {"1", "2", "3", "4", "5", "6"}
+
+    overrides: dict = {}
+
+    # --- Stripe ---
+    if "1" in choices:
+        key = console.input(
+            "Stripe API key (or press Enter to use ${STRIPE_SECRET_KEY}): "
+        ).strip() or "${STRIPE_SECRET_KEY}"
+        overrides["stripe"] = StripeConfig(enabled=True, api_key=key)
+
+    # --- Email ---
+    if "2" in choices:
+        console.print("  Email provider: [cyan][1][/cyan] Resend  [cyan][2][/cyan] SendGrid")
+        ep = console.input("  Choose [1/2, default 1]: ").strip()
+        email_provider = "sendgrid" if ep == "2" else "resend"
+        default_env = "${SENDGRID_API_KEY}" if email_provider == "sendgrid" else "${RESEND_API_KEY}"
+        email_key = console.input(
+            f"  API key (or press Enter to use {default_env}): "
+        ).strip() or default_env
+        from_addr = console.input("  From address (e.g. hello@example.com): ").strip()
+        overrides["email"] = EmailConfig(
+            enabled=True,
+            provider=email_provider,
+            api_key=email_key,
+            from_address=from_addr,
+            from_name=company_name,
+        )
+
+    # --- Gumroad ---
+    if "3" in choices:
+        token = console.input(
+            "Gumroad access token (or press Enter to use ${GUMROAD_ACCESS_TOKEN}): "
+        ).strip() or "${GUMROAD_ACCESS_TOKEN}"
+        overrides["gumroad"] = GumroadConfig(enabled=True, access_token=token)
+
+    # --- Cal.com ---
+    if "4" in choices:
+        cal_key = console.input(
+            "Cal.com API key (or press Enter to use ${CALCOM_API_KEY}): "
+        ).strip() or "${CALCOM_API_KEY}"
+        dur = console.input("  Default meeting duration in minutes [30]: ").strip()
+        duration = int(dur) if dur.isdigit() else 30
+        overrides["calcom"] = CalcomConfig(
+            enabled=True, api_key=cal_key, default_duration=duration,
+        )
+
+    # --- Invoices ---
+    if "5" in choices:
+        payment_info = console.input(
+            "Payment instructions (e.g. 'Pay via bank transfer to ...'): "
+        ).strip()
+        overrides["invoice"] = InvoiceConfig(
+            enabled=True,
+            company_name=company_name,
+            payment_instructions=payment_info,
+        )
+
+    # --- Landing Pages ---
+    if "6" in choices:
+        overrides["landing_page"] = LandingPageConfig(enabled=True)
+
+    return overrides
+
+
+# ------------------------------------------------------------------
 # init
 # ------------------------------------------------------------------
 
@@ -92,6 +189,7 @@ def init(
     api_key: str = typer.Option(None, "--api-key", "-k", help="API key for the chosen provider"),
     model: str = typer.Option(None, "--model", "-m", help="Model name (defaults per provider)"),
     base_url: str = typer.Option(None, "--base-url", "-b", help="Base URL for OpenAI-compatible endpoints"),
+    skip_integrations: bool = typer.Option(False, "--skip-integrations", help="Skip integration setup prompts"),
 ):
     """Initialize a new AI agent company in the current directory."""
     from agent_company_ai.core.company import Company
@@ -166,6 +264,11 @@ def init(
             elif not _fully_specified:
                 chosen_model = console.input("Model name: ").strip()
 
+    # Prompt for integrations unless skipped
+    integration_overrides: dict = {}
+    if not _fully_specified and not skip_integrations:
+        integration_overrides = _prompt_integrations(name)
+
     async def _init():
         company = await Company.init(name=name, company=_selected_company)
         company_dir = company.company_dir
@@ -183,7 +286,12 @@ def init(
                 company.config.llm.anthropic = provider_config
             else:
                 company.config.llm.openai = provider_config
-            save_config(company.config, company_dir / "config.yaml")
+
+        # Apply integration overrides
+        for key, cfg in integration_overrides.items():
+            setattr(company.config.integrations, key, cfg)
+
+        save_config(company.config, company_dir / "config.yaml")
 
         await company.shutdown()
         return company_dir
@@ -200,11 +308,18 @@ def init(
     else:
         provider_line = "Provider: [yellow]not configured[/yellow] — edit config.yaml or re-run init\n"
 
+    if integration_overrides:
+        enabled_names = ", ".join(sorted(integration_overrides.keys()))
+        integrations_line = f"Integrations: [cyan]{enabled_names}[/cyan]\n"
+    else:
+        integrations_line = "Integrations: [yellow]none[/yellow] — edit config.yaml or re-run init\n"
+
     console.print(Panel(
         f"[bold green]Company '{name}' initialized![/bold green]\n\n"
         f"Directory: {company_dir}\n"
         f"Config: {company_dir / 'config.yaml'}\n"
-        f"{provider_line}\n"
+        f"{provider_line}"
+        f"{integrations_line}\n"
         f"Next steps:\n"
         f"  agent-company-ai hire ceo --name Alice\n"
         f"  agent-company-ai hire developer --name Bob\n"

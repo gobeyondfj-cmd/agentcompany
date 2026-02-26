@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-company-ai"
-version = "0.3.8"
+version = "0.3.9"
 description = "Spin up an AI agent company - a business run by AI agents, managed by you"
 readme = "README.md"
 license = "MIT"

@@ -16,12 +16,36 @@ pip install agent-company-ai
 agent-company-ai init --name "My AI Startup"
 ```
 
-You'll be prompted to choose an LLM provider (Anthropic, OpenAI, DeepSeek, Ollama, and more).
+You'll be prompted to:
+1. **Choose an LLM provider** — Anthropic, OpenAI, DeepSeek, Ollama, and more
+2. **Configure integrations** — Stripe, Email, Gumroad, Cal.com, Invoices, Landing Pages
+
+The integration menu lets you pick any combination (comma-separated) or select "All":
+
+```
+Configure integrations (optional)
+  [1] Stripe (payment links & subscriptions)
+  [2] Email (send invoices & notifications)
+  [3] Gumroad (sell digital products)
+  [4] Cal.com (paid bookings)
+  [5] Invoices (generate & send invoices)
+  [6] Landing Pages (auto-enabled, no key needed)
+  [7] All of the above
+  [8] Skip for now
+```
+
+For each selected integration you'll be prompted for its API key (or press Enter to use an environment variable placeholder like `${STRIPE_SECRET_KEY}`).
 
 **Non-interactive mode** (for CI/scripts):
 
 ```bash
 agent-company-ai init --name "Acme AI" --provider anthropic --api-key $ANTHROPIC_API_KEY
+```
+
+This skips all interactive prompts (LLM and integrations). To skip only integration prompts:
+
+```bash
+agent-company-ai init --name "Acme AI" --skip-integrations
 ```
 
 ### 2. One-command setup
@@ -80,7 +104,7 @@ agent-company-ai revenue --days 30
 
 | Command | Description |
 |---------|-------------|
-| `init` | Initialize a new company |
+| `init` | Initialize a new company (with LLM + integration setup prompts) |
 | `setup <preset>` | Set up a full company from a template |
 | `hire <role>` | Hire an agent |
 | `fire <name>` | Remove an agent |
