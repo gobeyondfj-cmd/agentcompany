@@ -2,7 +2,7 @@
 
 **Spin up an AI agent company - a business run by AI agents, managed by you.**
 
-Agent Company AI lets a solo entrepreneur create a virtual company staffed entirely by AI agents. Each agent has a specific business role (CEO, CTO, Developer, Marketer, etc.), they collaborate on tasks, and you manage everything through a CLI or web dashboard.
+Agent Company AI lets a solo entrepreneur create a virtual company staffed entirely by AI agents. Each agent has a specific business role (CEO, CTO, Developer, Marketer, etc.), they collaborate on tasks, and you manage everything through a CLI or web dashboard. Agents can earn real money with built-in Stripe, Gumroad, invoicing, and booking integrations.
 
 ## Quick Start
 
@@ -18,13 +18,19 @@ agent-company-ai init --name "My AI Startup"
 
 You'll be prompted to choose an LLM provider (Anthropic, OpenAI, DeepSeek, Ollama, and more).
 
+**Non-interactive mode** (for CI/scripts):
+
+```bash
+agent-company-ai init --name "Acme AI" --provider anthropic --api-key $ANTHROPIC_API_KEY
+```
+
 ### 2. One-command setup
 
 Spin up a full team from a preset template:
 
 ```bash
 agent-company-ai setup tech_startup --name "Acme AI"
-agent-company-ai setup saas --name "CloudCo" --provider anthropic
+agent-company-ai setup saas --name "CloudCo" --provider anthropic --api-key $ANTHROPIC_API_KEY
 agent-company-ai setup --list  # see all presets
 ```
 
@@ -64,6 +70,12 @@ The CEO will break down the goal, delegate tasks to the team, and agents will co
 agent-company-ai run "Launch MVP" --cycles 3 --timeout 600 --max-tasks 20
 ```
 
+### 6. Check revenue
+
+```bash
+agent-company-ai revenue --days 30
+```
+
 ## Commands
 
 | Command | Description |
@@ -82,6 +94,7 @@ agent-company-ai run "Launch MVP" --cycles 3 --timeout 600 --max-tasks 20
 | `status` | Company overview |
 | `output` | List deliverables produced by agents |
 | `roles` | List available roles |
+| `revenue` | Revenue summary across all sources |
 | `companies` | List all companies in this directory |
 | `destroy` | Permanently delete a company |
 | `profit-engine <cmd>` | Configure business model DNA ([details](#profitengine--business-dna)) |
@@ -99,6 +112,129 @@ You can also set the company via environment variable:
 export AGENT_COMPANY_NAME=my-startup
 agent-company-ai team  # operates on my-startup
 ```
+
+## Money-Earning Tools
+
+Agents can generate real revenue using built-in integrations. All tools are rate-limited and logged to the database.
+
+### Stripe Payment Links & Subscriptions
+
+Create one-time payment links and recurring subscription links directly from agent workflows.
+
+```yaml
+# config.yaml
+integrations:
+  stripe:
+    enabled: true
+    api_key: ${STRIPE_SECRET_KEY}
+    max_link_amount_cents: 50000  # $500 safety cap per link
+```
+
+**Tools:** `create_payment_link`, `create_subscription_link`, `list_subscribers`, `check_subscription_revenue`
+
+### Gumroad Products
+
+Create and sell digital products on Gumroad.
+
+```yaml
+integrations:
+  gumroad:
+    enabled: true
+    api_key: ${GUMROAD_ACCESS_TOKEN}
+```
+
+**Tools:** `create_gumroad_product`, `list_gumroad_products`, `check_gumroad_sales`
+
+### Invoices
+
+Generate professional HTML invoices, email them to clients, and track payment status. No external API required.
+
+```yaml
+integrations:
+  invoice:
+    enabled: true
+    company_name: "Acme AI Inc."
+    company_address: "123 AI Street"
+    payment_instructions: "Pay via bank transfer to..."
+    currency: USD
+```
+
+**Tools:** `create_invoice`, `send_invoice`, `list_invoices`, `mark_invoice_paid`
+
+Invoices are saved as HTML files in `.agent-company-ai/default/invoices/`.
+
+### Cal.com Bookings
+
+Create booking event types for paid consultations.
+
+```yaml
+integrations:
+  calcom:
+    enabled: true
+    api_key: ${CALCOM_API_KEY}
+    default_duration: 30
+```
+
+**Tools:** `create_booking_link`, `list_bookings`, `check_booking_revenue`
+
+> **Note:** Payment collection requires Cal.com payment app setup in your dashboard. The price is recorded locally for revenue tracking.
+
+### Revenue Ledger
+
+Unified revenue tracking across all sources — Stripe, Gumroad, invoices, crypto, and manual entries.
+
+**Tools:** `check_revenue`, `record_revenue`, `sync_stripe_revenue`
+
+```bash
+# CLI command
+agent-company-ai revenue --days 30
+```
+
+### Email & Landing Pages
+
+Send transactional emails (via Resend or SendGrid) and generate landing pages.
+
+```yaml
+integrations:
+  email:
+    enabled: true
+    provider: resend       # or sendgrid
+    api_key: ${RESEND_API_KEY}
+    from_address: hello@yourdomain.com
+  landing_page:
+    enabled: true
+```
+
+**Tools:** `send_email`, `generate_landing_page`
+
+### Social Media
+
+Draft social media posts for review.
+
+```yaml
+integrations:
+  social:
+    enabled: true
+    twitter:
+      api_key: ${TWITTER_API_KEY}
+      api_secret: ${TWITTER_API_SECRET}
+      access_token: ${TWITTER_ACCESS_TOKEN}
+      access_secret: ${TWITTER_ACCESS_SECRET}
+```
+
+**Tools:** `draft_social_post`, `publish_twitter`
+
+### Rate Limits
+
+All integrations have configurable rate limits to prevent runaway spending:
+
+| Resource | Default Limit |
+|----------|---------------|
+| Emails | 20/hour, 100/day |
+| Payment links | 10/day, $500 max per link |
+| Gumroad products | 50/day |
+| Invoices | 50/day |
+| Bookings | 20/day |
 
 ## ProfitEngine — Business DNA
 
@@ -271,6 +407,8 @@ agent-company-ai destroy --yes  # destroy default, skip confirmation
     default/
         config.yaml
         company.db
+        invoices/
+        output/
     my-startup/
         config.yaml
         company.db
@@ -294,7 +432,7 @@ Existing single-company setups are automatically migrated into `default/` on fir
 
 ## LLM Providers
 
-Supports 11 providers out of the box:
+Supports 11 providers out of the box. All providers include automatic retry with exponential backoff on transient errors (429, 500-503).
 
 | Provider | Models | API Key Env Var |
 |----------|--------|-----------------|
@@ -353,18 +491,57 @@ Features:
 
 Agents have access to these tools based on their role:
 
+### Core Tools
+
 | Tool | Description |
 |------|-------------|
-| **web_search** | Search the web via DuckDuckGo (no API key needed) |
-| **read_file** / **write_file** | File operations in the workspace (sandboxed) |
-| **code_exec** | Execute Python code (restricted builtins) |
-| **shell** | Run shell commands (30s timeout, dangerous patterns blocked) |
-| **delegate_task** | Delegate work to other agents |
-| **report_result** | Submit task results |
-| **check_balance** | Check wallet balance (wallet-enabled agents) |
-| **get_wallet_address** | Get company wallet address (wallet-enabled agents) |
-| **list_payments** | View payment queue (wallet-enabled agents) |
-| **request_payment** | Request a payment — goes to approval queue (wallet-enabled agents) |
+| `web_search` | Search the web via DuckDuckGo (no API key needed) |
+| `read_file` / `write_file` | File operations in the workspace (sandboxed) |
+| `code_exec` | Execute Python code (restricted builtins) |
+| `shell` | Run shell commands (30s timeout, dangerous patterns blocked) |
+| `delegate_task` | Delegate work to other agents |
+| `report_result` | Submit task results |
+
+### Revenue Tools
+
+| Tool | Description |
+|------|-------------|
+| `create_payment_link` | Create Stripe one-time payment link |
+| `create_subscription_link` | Create Stripe recurring subscription link |
+| `list_subscribers` | List active Stripe subscribers with MRR |
+| `check_subscription_revenue` | Calculate MRR/ARR from Stripe subscriptions |
+| `create_gumroad_product` | Create a digital product on Gumroad |
+| `list_gumroad_products` | List Gumroad products |
+| `check_gumroad_sales` | Check Gumroad sales revenue |
+| `create_invoice` | Generate a professional HTML invoice |
+| `send_invoice` | Email an invoice to a client |
+| `list_invoices` | List invoices with status filter |
+| `mark_invoice_paid` | Mark an invoice as paid |
+| `create_booking_link` | Create a Cal.com booking event type |
+| `list_bookings` | List Cal.com bookings |
+| `check_booking_revenue` | Check booking pricing summary |
+| `check_revenue` | Unified revenue summary across all sources |
+| `record_revenue` | Manually record revenue (cash, crypto, etc.) |
+| `sync_stripe_revenue` | Sync Stripe charges into revenue ledger |
+
+### Communication & Outreach Tools
+
+| Tool | Description |
+|------|-------------|
+| `send_email` | Send transactional email (Resend/SendGrid) |
+| `generate_landing_page` | Generate a full HTML landing page |
+| `draft_social_post` | Draft social media content |
+| `publish_twitter` | Publish a tweet |
+| `manage_contacts` | CRM contact management |
+
+### Wallet Tools
+
+| Tool | Description |
+|------|-------------|
+| `check_balance` | Check wallet balance |
+| `get_wallet_address` | Get company wallet address |
+| `list_payments` | View payment queue |
+| `request_payment` | Request a payment (goes to approval queue) |
 
 ## Autonomous Mode
 
@@ -375,7 +552,7 @@ The company runs in CEO-driven cycles:
 3. **Review** - CEO evaluates progress and decides: DONE, CONTINUE, or FAILED
 4. **Loop** - Repeat until goal achieved or limits reached
 
-When ProfitEngine is enabled, the CEO factors business DNA into every planning and review decision.
+When ProfitEngine is enabled, the CEO factors business DNA into every planning and review decision. Incomplete tasks are automatically cancelled (not failed) when the goal loop ends.
 
 **Configurable limits** (in `config.yaml` or via CLI flags):
 - `max_cycles: 5` — CEO review loops
