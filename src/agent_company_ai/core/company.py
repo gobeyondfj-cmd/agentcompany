@@ -45,6 +45,9 @@ from agent_company_ai.tools.invoice_tool import (
 from agent_company_ai.tools.stripe_subs import set_stripe_subs_config, set_stripe_subs_db, set_stripe_subs_agent
 from agent_company_ai.tools.booking_tool import set_booking_config, set_booking_db, set_booking_agent
 from agent_company_ai.tools.revenue_tools import set_revenue_db, set_revenue_agent, set_revenue_stripe_key
+from agent_company_ai.tools.prospect_tool import set_prospect_db, set_prospect_agent
+from agent_company_ai.tools.content_tool import set_content_db, set_content_agent, set_content_company_dir, set_content_company_name
+from agent_company_ai.tools.browser_tool import set_browser_db, set_browser_agent
 from agent_company_ai.tools.rate_limiter import RateLimiter
 from agent_company_ai.wallet.manager import WalletManager
 
@@ -178,6 +181,17 @@ class Company:
         if intg.stripe.enabled:
             set_revenue_stripe_key(intg.stripe.api_key)
 
+        # Prospect tool (always available)
+        set_prospect_db(db)
+
+        # Content tool (always available)
+        set_content_db(db)
+        set_content_company_dir(company_dir)
+        set_content_company_name(config.name)
+
+        # Browser tool (always available)
+        set_browser_db(db)
+
         # Rate limiter
         limiter = RateLimiter.get()
         limiter.configure("email_hourly", intg.rate_limits.emails_per_hour, 3600)
@@ -188,6 +202,10 @@ class Company:
         limiter.configure("gumroad_daily", intg.rate_limits.gumroad_daily, 86400)
         limiter.configure("invoices_daily", intg.rate_limits.invoices_daily, 86400)
         limiter.configure("bookings_daily", intg.rate_limits.bookings_daily, 86400)
+        limiter.configure("prospect_hourly", intg.rate_limits.prospects_per_hour, 3600)
+        limiter.configure("prospect_daily", intg.rate_limits.prospects_per_day, 86400)
+        limiter.configure("browse_hourly", intg.rate_limits.browse_per_hour, 3600)
+        limiter.configure("browse_daily", intg.rate_limits.browse_per_day, 86400)
 
         # Global message listener for persistence
         self.bus.set_global_listener(self._on_bus_message)

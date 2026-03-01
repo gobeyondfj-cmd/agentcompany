@@ -55,5 +55,12 @@ default_tools:
   - check_revenue
   - record_revenue
   - sync_stripe_revenue
+  - prospect_search
+  - enrich_contact
+  - prospect_campaign
+  - create_blog_post
+  - create_email_sequence
+  - browse_page
+  - extract_contacts_from_url
 can_delegate_to: []
 reports_to: ceo

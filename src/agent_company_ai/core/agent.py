@@ -25,6 +25,9 @@ from agent_company_ai.tools.invoice_tool import set_invoice_agent
 from agent_company_ai.tools.stripe_subs import set_stripe_subs_agent
 from agent_company_ai.tools.booking_tool import set_booking_agent
 from agent_company_ai.tools.revenue_tools import set_revenue_agent
+from agent_company_ai.tools.prospect_tool import set_prospect_agent
+from agent_company_ai.tools.content_tool import set_content_agent
+from agent_company_ai.tools.browser_tool import set_browser_agent
 
 if TYPE_CHECKING:
     from agent_company_ai.storage.database import Database
@@ -148,6 +151,9 @@ class Agent:
         set_stripe_subs_agent(self.name)
         set_booking_agent(self.name)
         set_revenue_agent(self.name)
+        set_prospect_agent(self.name)
+        set_content_agent(self.name)
+        set_browser_agent(self.name)
 
         # Build messages
         messages = [

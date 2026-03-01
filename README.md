@@ -248,6 +248,40 @@ integrations:
 
 **Tools:** `draft_social_post`, `publish_twitter`
 
+### Lead Prospecting
+
+Find leads, enrich contact info, and auto-add to CRM — no API keys needed. Uses DuckDuckGo search + website scraping.
+
+```bash
+agent-company-ai assign "Find 5 SaaS companies in the US and add them to our CRM"
+```
+
+**Tools:** `prospect_search`, `enrich_contact`, `prospect_campaign`
+
+- `prospect_search` — Search for companies by industry, keywords, and location
+- `enrich_contact` — Scrape a company's website for emails, phones, and social links
+- `prospect_campaign` — Full pipeline: search → enrich → CRM insert in one call
+
+### Content Generation
+
+Create publish-ready blog posts, email sequences, and digital products from markdown. No API keys needed — all content is generated locally as styled HTML files.
+
+**Tools:** `create_blog_post`, `create_email_sequence`, `create_digital_product`
+
+- `create_blog_post` — Markdown → styled HTML blog post with SEO meta tags. Saved to `content/blog/`
+- `create_email_sequence` — Drip campaign builder (onboarding, sales, nurture, launch). Stored in DB for use with email tool
+- `create_digital_product` — Multi-chapter HTML ebook with TOC. Saved to `content/products/`
+
+### Browser Automation
+
+Scrape websites, extract structured data, and submit forms — no API keys needed.
+
+**Tools:** `browse_page`, `extract_contacts_from_url`, `submit_form`
+
+- `browse_page` — Fetch any URL and extract text, links, emails, meta tags, or forms
+- `extract_contacts_from_url` — Multi-page contact extraction (checks main page + /contact + /about)
+- `submit_form` — POST/GET form data to any URL
+
 ### Rate Limits
 
 All integrations have configurable rate limits to prevent runaway spending:
@@ -259,6 +293,8 @@ All integrations have configurable rate limits to prevent runaway spending:
 | Gumroad products | 50/day |
 | Invoices | 50/day |
 | Bookings | 20/day |
+| Prospect searches | 30/hour, 200/day |
+| Page browses | 60/hour, 500/day |
 
 ## ProfitEngine — Business DNA
 
@@ -548,15 +584,42 @@ Agents have access to these tools based on their role:
 | `record_revenue` | Manually record revenue (cash, crypto, etc.) |
 | `sync_stripe_revenue` | Sync Stripe charges into revenue ledger |
 
+### Lead Prospecting Tools
+
+| Tool | Description |
+|------|-------------|
+| `prospect_search` | Search for companies by industry/keywords/location |
+| `enrich_contact` | Scrape a company's website for emails, phones, social links |
+| `prospect_campaign` | Full pipeline: search → enrich → CRM insert |
+
+### Content Generation Tools
+
+| Tool | Description |
+|------|-------------|
+| `create_blog_post` | Markdown → styled HTML blog post with SEO meta |
+| `create_email_sequence` | Build email drip campaigns (onboarding, sales, nurture) |
+| `create_digital_product` | Multi-chapter HTML ebook/guide with TOC |
+
+### Browser Automation Tools
+
+| Tool | Description |
+|------|-------------|
+| `browse_page` | Fetch URL and extract text/links/emails/meta/forms |
+| `extract_contacts_from_url` | Multi-page contact extraction from a website |
+| `submit_form` | Submit POST/GET form data to any URL |
+
 ### Communication & Outreach Tools
 
 | Tool | Description |
 |------|-------------|
 | `send_email` | Send transactional email (Resend/SendGrid) |
-| `generate_landing_page` | Generate a full HTML landing page |
+| `create_landing_page` | Generate a styled HTML landing page |
+| `deploy_landing_page` | Deploy a landing page to Vercel |
 | `draft_social_post` | Draft social media content |
-| `publish_twitter` | Publish a tweet |
-| `manage_contacts` | CRM contact management |
+| `publish_social_post` | Publish a tweet via Twitter API |
+| `add_contact` | Add a contact to the CRM |
+| `list_contacts` | Search and list CRM contacts |
+| `update_contact` | Update an existing CRM contact |
 
 ### Wallet Tools
 

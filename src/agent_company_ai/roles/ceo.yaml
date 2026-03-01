@@ -42,6 +42,8 @@ default_tools:
   - check_subscription_revenue
   - list_bookings
   - check_revenue
+  - prospect_search
+  - browse_page
 can_delegate_to:
   - cto
   - marketer

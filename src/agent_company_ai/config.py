@@ -171,6 +171,10 @@ class RateLimitConfig(BaseModel):
     gumroad_daily: int = 50
     invoices_daily: int = 50
     bookings_daily: int = 20
+    prospects_per_hour: int = 30
+    prospects_per_day: int = 200
+    browse_per_hour: int = 60
+    browse_per_day: int = 500
 
 
 class EmailConfig(BaseModel):

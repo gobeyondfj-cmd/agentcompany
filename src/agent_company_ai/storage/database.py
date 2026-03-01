@@ -329,6 +329,42 @@ class Database:
                 recorded_by TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS prospect_searches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                query TEXT NOT NULL,
+                industry TEXT DEFAULT '',
+                location TEXT DEFAULT '',
+                results_count INTEGER DEFAULT 0,
+                searched_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS content_pieces (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                content_type TEXT NOT NULL,
+                title TEXT DEFAULT '',
+                slug TEXT DEFAULT '',
+                file_path TEXT DEFAULT '',
+                html_content TEXT DEFAULT '',
+                json_content TEXT DEFAULT '',
+                status TEXT DEFAULT 'draft',
+                word_count INTEGER DEFAULT 0,
+                created_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS browse_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                status_code INTEGER DEFAULT 0,
+                extract_mode TEXT DEFAULT '',
+                extracted_emails_count INTEGER DEFAULT 0,
+                extracted_links_count INTEGER DEFAULT 0,
+                browsed_by TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
             """
         )
         await self._conn.commit()
