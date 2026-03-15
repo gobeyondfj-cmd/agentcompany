@@ -95,7 +95,8 @@ class AutonomousConfig(BaseModel):
     max_agent_iterations: int = 25  # tool-call loops per agent per task
     max_total_tasks: int = 50       # hard cap on total tasks created
     max_time_seconds: int = 3600    # 1 hour wall-clock timeout (0 = unlimited)
-    max_cost_usd: float = 0.0      # spending cap (0 = unlimited, requires usage tracking)
+    max_cost_usd: float = 10.0     # per-run spending cap in USD (0 = unlimited)
+    daily_budget_usd: float = 20.0  # rolling 24-hour budget in USD (0 = unlimited)
 
 
 class WalletConfig(BaseModel):

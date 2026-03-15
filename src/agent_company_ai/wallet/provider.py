@@ -5,25 +5,41 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 
-from web3 import Web3
-from web3.middleware import ExtraDataToPOAMiddleware
+try:
+    from web3 import Web3
+    from web3.middleware import ExtraDataToPOAMiddleware
+    _HAS_WEB3 = True
+except ImportError:
+    _HAS_WEB3 = False
+    Web3 = None  # type: ignore[assignment, misc]
+    ExtraDataToPOAMiddleware = None  # type: ignore[assignment, misc]
 
 from agent_company_ai.wallet.chains import CHAINS, get_chain
 
 logger = logging.getLogger("agent_company_ai.wallet.provider")
+
+_INSTALL_HINT = "pip install agent-company-ai[blockchain]"
+
+
+def _require_web3() -> None:
+    if not _HAS_WEB3:
+        raise ImportError(
+            f"web3 is required for blockchain operations. Install it with: {_INSTALL_HINT}"
+        )
 
 
 class Web3Provider:
     """Manages Web3 connections across multiple EVM chains."""
 
     def __init__(self) -> None:
-        self._instances: dict[str, Web3] = {}
+        self._instances: dict[str, "Web3"] = {}
 
-    def get_web3(self, chain_name: str) -> Web3:
+    def get_web3(self, chain_name: str) -> "Web3":
         """Return a (cached) Web3 instance for the given chain.
 
         Injects POA middleware for non-mainnet chains.
         """
+        _require_web3()
         if chain_name in self._instances:
             return self._instances[chain_name]
 

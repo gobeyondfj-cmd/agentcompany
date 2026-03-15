@@ -573,6 +573,7 @@ def run(
     max_cycles: int = typer.Option(None, "--cycles", "-c", help="Max CEO review cycles (default: from config)"),
     max_time: int = typer.Option(None, "--timeout", "-T", help="Wall-clock timeout in seconds (default: from config)"),
     max_tasks: int = typer.Option(None, "--max-tasks", help="Max total tasks to create (default: from config)"),
+    budget: float = typer.Option(None, "--budget", "-B", help="Daily budget in USD (default: from config, 20.0)"),
 ):
     """Run the company autonomously toward a goal. The CEO will delegate.
 
@@ -593,14 +594,19 @@ def run(
             company.config.autonomous.max_time_seconds = max_time
         if max_tasks is not None:
             company.config.autonomous.max_total_tasks = max_tasks
+        if budget is not None:
+            company.config.autonomous.daily_budget_usd = budget
 
         limits = company.config.autonomous
+        budget_str = f"${limits.daily_budget_usd:.0f}/day" if limits.daily_budget_usd > 0 else "unlimited"
+        cost_str = f"${limits.max_cost_usd:.0f}/run" if limits.max_cost_usd > 0 else "unlimited"
         console.print(Panel(
             f"[bold]Goal:[/bold] {goal}\n\n"
             f"The CEO will plan, delegate, and review in cycles.\n"
             f"Limits: {limits.max_cycles} cycles, "
             f"{limits.max_time_seconds}s timeout, "
-            f"{limits.max_total_tasks} max tasks\n\n"
+            f"{limits.max_total_tasks} max tasks\n"
+            f"Budget: {cost_str} per run, {budget_str} rolling\n\n"
             f"[dim]Press Ctrl+C to stop gracefully.[/dim]",
             title="Autonomous Mode",
             border_style="green",

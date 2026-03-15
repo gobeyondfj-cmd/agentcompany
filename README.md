@@ -1,13 +1,40 @@
 # Agent Company AI
 
+[![PyPI version](https://img.shields.io/pypi/v/agent-company-ai.svg)](https://pypi.org/project/agent-company-ai/)
+[![Python versions](https://img.shields.io/pypi/pyversions/agent-company-ai.svg)](https://pypi.org/project/agent-company-ai/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://github.com/gobeyondfj-cmd/agent-company-ai/actions/workflows/test.yml/badge.svg)](https://github.com/gobeyondfj-cmd/agent-company-ai/actions/workflows/test.yml)
+[![Downloads](https://img.shields.io/pypi/dm/agent-company-ai.svg)](https://pypi.org/project/agent-company-ai/)
+
 **Spin up an AI agent company - a business run by AI agents, managed by you.**
 
 Agent Company AI lets a solo entrepreneur create a virtual company staffed entirely by AI agents. Each agent has a specific business role (CEO, CTO, Developer, Marketer, etc.), they collaborate on tasks, and you manage everything through a CLI or web dashboard. Agents can earn real money with built-in Stripe, Gumroad, invoicing, and booking integrations.
+
+### Key Features
+
+- **9 preset roles** — CEO, CTO, Developer, Marketer, Sales, Support, Finance, HR, Project Manager
+- **11 LLM providers** — Anthropic, OpenAI, DeepSeek, Ollama, Together, Groq, and more
+- **50+ built-in tools** — web search, email, Stripe, Gumroad, invoicing, CRM, landing pages, social media, browser automation, lead prospecting, content generation
+- **Autonomous CEO mode** — set a goal, the CEO plans, delegates, and reviews in cycles
+- **Cost safety defaults** — $10/run and $20/day spending caps out of the box
+- **Web dashboard** — real-time org chart, kanban board, chat, cost tracker
+- **Revenue tracking** — unified ledger across Stripe, Gumroad, invoices, crypto, and manual entries
+- **ProfitEngine** — inject your business DNA into every agent's decision-making
 
 ## Quick Start
 
 ```bash
 pip install agent-company-ai
+```
+
+Optional extras:
+
+```bash
+# Blockchain wallet support (Ethereum, Base, Arbitrum, Polygon)
+pip install agent-company-ai[blockchain]
+
+# Development dependencies (pytest, coverage)
+pip install agent-company-ai[dev]
 ```
 
 ### 1. Initialize your company
@@ -646,7 +673,37 @@ When ProfitEngine is enabled, the CEO factors business DNA into every planning a
 - `max_waves_per_cycle: 10` — parallel execution waves per cycle
 - `max_total_tasks: 50` — hard cap on tasks
 - `max_time_seconds: 3600` — wall-clock timeout
-- `max_cost_usd: 0.0` — spending cap (0 = unlimited)
+- `max_cost_usd: 10.0` — per-run spending cap ($10 default)
+- `daily_budget_usd: 20.0` — rolling 24h budget ($20 default)
+
+## Cost Safety
+
+Agent Company AI ships with safe spending defaults to prevent runaway API costs:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `max_cost_usd` | **$10.00** | Maximum spend per `run` invocation |
+| `daily_budget_usd` | **$20.00** | Rolling 24-hour budget across all runs |
+
+Override via CLI:
+
+```bash
+# Set a $5/day budget for this run
+agent-company-ai run "Build MVP" --budget 5
+
+# Unlimited (not recommended)
+agent-company-ai run "Build MVP" --budget 0
+```
+
+Or in `config.yaml`:
+
+```yaml
+autonomous:
+  max_cost_usd: 10.0      # per-run cap
+  daily_budget_usd: 20.0   # rolling 24h cap
+```
+
+The cost tracker monitors API usage in real time and stops the autonomous loop when either limit is reached.
 
 ## Custom Roles
 

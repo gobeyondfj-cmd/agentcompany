@@ -49,7 +49,13 @@ from agent_company_ai.tools.prospect_tool import set_prospect_db, set_prospect_a
 from agent_company_ai.tools.content_tool import set_content_db, set_content_agent, set_content_company_dir, set_content_company_name
 from agent_company_ai.tools.browser_tool import set_browser_db, set_browser_agent
 from agent_company_ai.tools.rate_limiter import RateLimiter
-from agent_company_ai.wallet.manager import WalletManager
+
+try:
+    from agent_company_ai.wallet.manager import WalletManager
+    _HAS_WALLET = True
+except ImportError:
+    _HAS_WALLET = False
+    WalletManager = None  # type: ignore[assignment, misc]
 
 logger = logging.getLogger("agent_company_ai.company")
 
@@ -90,13 +96,20 @@ class Company:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         set_output_dir(self.output_dir)
 
-        # Wallet manager
+        # Wallet manager (optional — requires `pip install agent-company-ai[blockchain]`)
         self.wallet_dir = company_dir / "wallet"
-        self.wallet_manager = WalletManager(self.wallet_dir, db)
-        set_wallet_db(db)
-        set_wallet_company_dir(company_dir)
-        if config.wallet.enabled and self.wallet_manager.has_wallet():
-            set_wallet_manager(self.wallet_manager)
+        self.wallet_manager = None
+        if _HAS_WALLET:
+            self.wallet_manager = WalletManager(self.wallet_dir, db)
+            set_wallet_db(db)
+            set_wallet_company_dir(company_dir)
+            if config.wallet.enabled and self.wallet_manager.has_wallet():
+                set_wallet_manager(self.wallet_manager)
+        else:
+            logger.debug(
+                "Wallet support unavailable (web3 not installed). "
+                "Install with: pip install agent-company-ai[blockchain]"
+            )
 
         # --- Integration tools ---
         intg = config.integrations
@@ -236,7 +249,7 @@ class Company:
                 logger.warning(f"Failed to restore agent {agent_cfg.name}: {e}")
 
         # Register wallet in DB if it exists
-        if company.wallet_manager.has_wallet():
+        if company.wallet_manager and company.wallet_manager.has_wallet():
             await company.wallet_manager.register_wallet_in_db()
 
         return company
@@ -648,6 +661,16 @@ class Company:
                 )
                 final_status = "failed"
                 break
+
+            if limits.daily_budget_usd > 0:
+                cost_24h = self.cost_tracker.cost_last_24h()
+                if cost_24h >= limits.daily_budget_usd:
+                    logger.warning(
+                        f"Daily budget reached (${cost_24h:.4f} >= "
+                        f"${limits.daily_budget_usd:.4f} in last 24h)."
+                    )
+                    final_status = "failed"
+                    break
 
             logger.info(f"=== Cycle {cycle + 1}/{limits.max_cycles} ===")
             await self._emit("goal.cycle", {

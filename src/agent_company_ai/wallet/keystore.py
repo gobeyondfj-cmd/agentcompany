@@ -5,7 +5,21 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from eth_account import Account
+try:
+    from eth_account import Account
+    _HAS_ETH_ACCOUNT = True
+except ImportError:
+    _HAS_ETH_ACCOUNT = False
+    Account = None  # type: ignore[assignment, misc]
+
+_INSTALL_HINT = "pip install agent-company-ai[blockchain]"
+
+
+def _require_eth_account() -> None:
+    if not _HAS_ETH_ACCOUNT:
+        raise ImportError(
+            f"eth-account is required for wallet operations. Install it with: {_INSTALL_HINT}"
+        )
 
 
 def create_wallet(wallet_dir: Path, password: str) -> str:
@@ -28,6 +42,7 @@ def create_wallet(wallet_dir: Path, password: str) -> str:
     FileExistsError
         If a keystore already exists in *wallet_dir*.
     """
+    _require_eth_account()
     keystore_path = wallet_dir / "keystore.json"
     if keystore_path.exists():
         raise FileExistsError(
@@ -57,9 +72,13 @@ def load_address(wallet_dir: Path) -> str | None:
     raw_address = data.get("address", "")
     if not raw_address.startswith("0x"):
         raw_address = "0x" + raw_address
-    from web3 import Web3
 
-    return Web3.to_checksum_address(raw_address)
+    try:
+        from web3 import Web3
+        return Web3.to_checksum_address(raw_address)
+    except ImportError:
+        # Without web3, return the raw address with 0x prefix
+        return raw_address
 
 
 def decrypt_key(wallet_dir: Path, password: str) -> bytes:
@@ -84,6 +103,7 @@ def decrypt_key(wallet_dir: Path, password: str) -> bytes:
     ValueError
         If the password is incorrect.
     """
+    _require_eth_account()
     keystore_path = wallet_dir / "keystore.json"
     if not keystore_path.exists():
         raise FileNotFoundError(f"No keystore found at {keystore_path}")

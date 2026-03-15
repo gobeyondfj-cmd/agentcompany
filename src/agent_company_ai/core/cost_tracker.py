@@ -126,6 +126,13 @@ class CostTracker:
                 "by_model": {k: round(v, 6) for k, v in sorted(by_model.items())},
             }
 
+    def cost_last_24h(self) -> float:
+        """Return the total cost of API calls made in the last 24 hours."""
+        from datetime import timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        with self._lock:
+            return sum(r.cost_usd for r in self._records if r.timestamp >= cutoff)
+
     def recent(self, limit: int = 20) -> list[dict]:
         """Return the most recent usage records."""
         with self._lock:
