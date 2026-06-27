@@ -14,7 +14,7 @@ Agent Company AI lets a solo entrepreneur create a virtual company staffed entir
 
 - **9 preset roles** — CEO, CTO, Developer, Marketer, Sales, Support, Finance, HR, Project Manager
 - **11 LLM providers** — Anthropic, OpenAI, DeepSeek, Ollama, Together, Groq, and more
-- **50+ built-in tools** — web search, email, Stripe, Gumroad, invoicing, CRM, landing pages, social media, browser automation, lead prospecting, content generation
+- **50+ built-in tools** — web search, email, Stripe, Gumroad, invoicing, CRM, landing pages, social media, browser automation, lead prospecting, content generation, webhook notifications
 - **Autonomous CEO mode** — set a goal, the CEO plans, delegates, and reviews in cycles
 - **Cost safety defaults** — $10/run and $20/day spending caps out of the box
 - **Web dashboard** — real-time org chart, kanban board, chat, cost tracker
@@ -626,6 +626,15 @@ Agents have access to these tools based on their role:
 | `create_blog_post` | Markdown → styled HTML blog post with SEO meta |
 | `create_email_sequence` | Build email drip campaigns (onboarding, sales, nurture) |
 | `create_digital_product` | Multi-chapter HTML ebook/guide with TOC |
+
+
+### Webhook & Notification Tools
+
+| Tool | Description |
+|------|-------------|
+| `send_webhook` | POST JSON payload to any URL -- Zapier, Make.com, n8n, custom APIs |
+| `send_slack_notification` | Send formatted messages to Slack via Incoming Webhooks |
+| `send_discord_notification` | Send messages/embeds to Discord channels via webhooks |
 
 ### Browser Automation Tools
 
